@@ -701,7 +701,7 @@
                     { name: "콘텐츠 도메인", options: ["일러스트", "캐릭터", "동물", "사람", "수채화", "풍경", "실사", "아이콘/심볼", "텍스트/타이포", "추상/패턴", "없음", "기타"] },
                     { name: "콘텐츠 도메인 상세", options: ["영유아", "어린이", "청소년", "청년", "중년", "노년", "남성", "여성", "그룹", "커플", "가족", "친구", "강아지", "고양이", "새", "물고기", "곰", "토끼", "야생동물", "애완동물", "전자기기", "가구", "의류", "차량", "산", "바다", "숲", "하늘", "일출", "일몰", "없음", "기타"], hasToggle: true },
                     { name: "콘텐츠 크기", options: ["미니형", "성인형", "불명", "없음", "기타"] },
-                    { name: "콘텐츠 성격", options: ["행복한", "즐거운", "평온한", "차분한", "고요한", "활기찬", "역동적인", "에너지넘치는", "몽환적인", "신비로운", "따뜻한", "아늑한", "포근한", "차가운", "시원한", "청량한", "우울한", "슬픈", "감성적인", "낭만적인", "극적인", "긴장감있는", "편안한", "자연스러운", "없음", "기타"], hasToggle: true },
+                    { name: "콘텐츠 성격", options: ["행복한", "즐거운", "평온한", "차분한", "귀여움", "고요한", "활기찬", "역동적인", "에너지넘치는", "몽환적인", "신비로운", "따뜻한", "아늑한", "포근한", "차가운", "시원한", "청량한", "우울한", "슬픈", "감성적인", "낭만적인", "극적인", "긴장감있는", "편안한", "자연스러운", "없음", "기타"], hasToggle: true },
                     { name: "콘텐츠 행동성", options: ["정적", "동작 많음", "없음", "기타"] },
                     { name: "콘텐츠 색상 스타일", options: ["파스텔톤", "흑백", "비비드톤", "단색위주", "없음", "기타"] }
                 ]
@@ -912,12 +912,30 @@ IMPORTANT: JSON 형식만 출력하세요 (마크다운 코드블록 없이)`;
                     
                     const formattedResults = CATEGORIES.map(category => ({
                         mainCategory: category.mainCategory,
-                        subCategories: category.subCategories.map(sub => ({
-                            name: sub.name,
-                            value: analysisResult[category.mainCategory]?.[sub.name] || "",
-                            options: sub.options,
-                            etcDetails: ""
-                        }))
+                        subCategories: category.subCategories.map(sub => {
+                            const aiValue = analysisResult[category.mainCategory]?.[sub.name] || "";
+                            
+                            // AI가 반환한 값이 옵션 목록에 있는지 확인
+                            const isValidOption = sub.options.includes(aiValue);
+                            
+                            // 옵션에 없고, 값이 있으면 자동으로 '기타' 처리
+                            if (!isValidOption && aiValue && aiValue !== "없음") {
+                                return {
+                                    name: sub.name,
+                                    value: "기타",
+                                    options: sub.options,
+                                    etcDetails: aiValue  // 원래 AI가 분석한 값을 기타 상세에 저장
+                                };
+                            }
+                            
+                            // 옵션에 있거나 빈 값이면 그대로 사용
+                            return {
+                                name: sub.name,
+                                value: aiValue,
+                                options: sub.options,
+                                etcDetails: ""
+                            };
+                        })
                     }));
                     
                     setImages(prev => prev.map((img, i) => 

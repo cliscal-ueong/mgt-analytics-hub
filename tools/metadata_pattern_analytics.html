@@ -594,6 +594,70 @@
             color: #9C27B0;
             font-size: 1.3em;
             margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tooltip-container {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            background: #9C27B0;
+            color: white;
+            border-radius: 50%;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: help;
+        }
+        
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            width: 350px;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 14px;
+            position: absolute;
+            z-index: 1000;
+            left: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: opacity 0.3s;
+            font-size: 0.85em;
+            line-height: 1.7;
+            font-weight: normal;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .tooltip-text::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            right: 100%;
+            transform: translateY(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: transparent #1e293b transparent transparent;
+        }
+        
+        .tooltip-text a {
+            color: #a78bfa;
+            text-decoration: none;
+        }
+        
+        .tooltip-text a:hover {
+            text-decoration: underline;
         }
 
         .api-input-group {
@@ -1062,7 +1126,21 @@
 
             <!-- Gemini API 설정 -->
             <div class="api-config-section" id="apiConfigSection" style="display: none;">
-                <h4>🤖 AI 분석 향상</h4>
+                <h4>
+                    🤖 AI 분석 연동
+                    <span class="tooltip-container">
+                        ?
+                        <span class="tooltip-text">
+                            <strong>💡 API 키 발급 방법:</strong><br>
+                            1. <a href="https://aistudio.google.com/app/apikey" target="_blank">해당 페이지</a> 접속<br>
+                            2. "Create API key" 클릭<br>
+                            3. 프로젝트 선택 또는 생성 (예: pattern-analysis)<br>
+                            4. 생성된 API 키 복사 후 위에 입력<br>
+                            <br>
+                            🔒 API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다.
+                        </span>
+                    </span>
+                </h4>
                 
                 <!-- API 입력 영역 -->
                 <div id="apiInputArea">
@@ -1076,16 +1154,6 @@
                             연결하기
                         </button>
                     </div>
-                    <p style="color: #666; font-size: 0.85em; margin-top: 10px; line-height: 1.6;">
-                        💡 <strong>API 키 발급 방법:</strong><br>
-                        1. <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #9C27B0;">Google AI Studio</a> 접속<br>
-                        2. "Create API key" 클릭<br>
-                        3. 프로젝트 선택 또는 생성 (예: pattern-analysis)<br>
-                        4. 생성된 API 키 복사 후 위에 입력<br>
-                        <br>
-                        ✨ <strong>무료 한도:</strong> Gemini 1.5 Flash (분당 15회, 일일 1,500회)<br>
-                        🔒 API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다.
-                    </p>
                 </div>
                 
                 <!-- API 상태 영역 -->

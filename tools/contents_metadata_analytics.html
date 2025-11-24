@@ -306,6 +306,70 @@
             color: #1e40af;
             margin-bottom: 15px;
             font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .tooltip-container {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            background: #3b82f6;
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: help;
+        }
+        
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            width: 320px;
+            background-color: #1e293b;
+            color: #fff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 12px;
+            position: absolute;
+            z-index: 1000;
+            left: 28px;
+            top: 50%;
+            transform: translateY(-50%);
+            transition: opacity 0.3s;
+            font-size: 12px;
+            line-height: 1.6;
+            font-weight: normal;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .tooltip-text::before {
+            content: "";
+            position: absolute;
+            top: 50%;
+            right: 100%;
+            transform: translateY(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: transparent #1e293b transparent transparent;
+        }
+        
+        .tooltip-text a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+        
+        .tooltip-text a:hover {
+            text-decoration: underline;
         }
         
         .api-key-input-group {
@@ -1076,7 +1140,19 @@ IMPORTANT: JSON 형식만 출력하세요 (마크다운 코드블록 없이)`;
                     {!apiKeySet ? (
                         <div style={{padding: '30px'}}>
                             <div className="api-key-setup">
-                                <h3>🔑 Google Gemini API 설정</h3>
+                                <h3>
+                                    🤖 AI 분석 연동
+                                    <div className="tooltip-container">
+                                        ?
+                                        <div className="tooltip-text">
+                                            <strong>💡 API 키 발급 방법:</strong><br/>
+                                            1. <a href="https://aistudio.google.com/app/apikey" target="_blank">해당 페이지</a>에 방문<br/>
+                                            2. "Get API Key" → "Create new API key" 클릭<br/>
+                                            3. API 키 복사 후 붙여넣기<br/><br/>
+                                            🔒 API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다.
+                                        </div>
+                                    </div>
+                                </h3>
                                 <div className="api-key-input-group">
                                     <input 
                                         type="password"
@@ -1087,12 +1163,6 @@ IMPORTANT: JSON 형식만 출력하세요 (마크다운 코드블록 없이)`;
                                         onKeyPress={(e) => e.key === 'Enter' && saveApiKey()}
                                     />
                                     <button className="btn-set-key" onClick={saveApiKey}>설정</button>
-                                </div>
-                                <div className="api-hint">
-                                    💡 <strong>API 키 가져오기:</strong><br/>
-                                    1. <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>에 방문<br/>
-                                    2. "Get API Key" → "Create new API key" 클릭<br/>
-                                    3. API 키 복사 후 붙여넣기
                                 </div>
                             </div>
                         </div>

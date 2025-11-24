@@ -1,0 +1,3718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>메타데이터 패턴 분석기</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(74, 144, 226, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4A90E2 0%, #5CA7F7 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            background: #F5FBFF;
+            border: 3px dashed #4A90E2;
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .upload-section:hover {
+            background: #E3F2FD;
+            border-color: #1565C0;
+        }
+
+        .upload-section.dragover {
+            background: #BBDEFB;
+            border-color: #0D47A1;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            color: #4A90E2;
+            margin-bottom: 20px;
+        }
+
+        .upload-section h3 {
+            color: #1565C0;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        .upload-section p {
+            color: #666;
+            font-size: 1em;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4A90E2 0%, #5CA7F7 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #81D4FA 0%, #4FC3F7 100%);
+        }
+
+        .data-preview {
+            margin-bottom: 30px;
+            display: none;
+        }
+
+        .data-preview-header {
+            cursor: pointer;
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .data-preview-header:hover {
+            background: linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%);
+        }
+
+        .data-preview-header h3 {
+            color: #1565C0;
+            font-size: 1.3em;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .data-stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            padding: 15px 25px;
+            border-radius: 10px;
+            border-left: 4px solid #4A90E2;
+        }
+
+        .stat-box strong {
+            color: #1565C0;
+            font-size: 1.1em;
+        }
+
+        .preview-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease;
+        }
+
+        .preview-content.open {
+            max-height: 500px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid #BBDEFB;
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+
+        thead {
+            background: linear-gradient(135deg, #4A90E2 0%, #5CA7F7 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid #E3F2FD;
+            font-size: 0.9em;
+            white-space: nowrap;
+            min-width: 80px;
+        }
+
+        td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid #E3F2FD;
+            font-size: 0.85em;
+            white-space: nowrap;
+        }
+
+        tbody tr:hover {
+            background: #F5FBFF;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #FAFAFA;
+        }
+
+        .analysis-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: white;
+            color: #4A90E2;
+            border: 2px solid #4A90E2;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1em;
+            font-weight: 600;
+        }
+
+        .tab-btn:hover {
+            background: #E3F2FD;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #4A90E2 0%, #5CA7F7 100%);
+            color: white;
+            border-color: #4A90E2;
+        }
+
+        .analysis-section {
+            display: none;
+        }
+
+        .analysis-section.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .explanation-box {
+            background: linear-gradient(135deg, #F5FBFF 0%, #E3F2FD 100%);
+            border-left: 4px solid #4A90E2;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .explanation-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .explanation-toggle h4 {
+            color: #1565C0;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-icon {
+            color: #4A90E2;
+            font-size: 1.5em;
+            transition: transform 0.3s;
+        }
+
+        .toggle-icon.open {
+            transform: rotate(180deg);
+        }
+
+        .explanation-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .explanation-content.open {
+            max-height: 500px;
+            margin-top: 15px;
+        }
+
+        .explanation-content p {
+            color: #444;
+            line-height: 1.8;
+            margin-bottom: 10px;
+        }
+
+        .explanation-content ul {
+            margin-left: 20px;
+            color: #444;
+            line-height: 1.8;
+        }
+
+        .result-box {
+            background: white;
+            border: 1px solid #BBDEFB;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .result-box h4 {
+            color: #1565C0;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .summary-box {
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 5px solid #4A90E2;
+        }
+
+        .summary-box h5 {
+            color: #0D47A1;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+
+        .summary-box ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .summary-box li {
+            color: #1565C0;
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .summary-box li:before {
+            content: "●";
+            color: #4A90E2;
+            font-size: 1.2em;
+            position: absolute;
+            left: 0;
+        }
+
+        .conclusion-box {
+            background: linear-gradient(135deg, #FFF9E6 0%, #FFF3CC 100%);
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border-left: 5px solid #FFA726;
+        }
+
+        .conclusion-box h5 {
+            color: #E65100;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .conclusion-summary {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 3px solid #FFA726;
+        }
+
+        .conclusion-summary p {
+            color: #333;
+            line-height: 1.8;
+            margin: 0;
+            font-size: 1.05em;
+            font-weight: 500;
+        }
+
+        .conclusion-actions {
+            margin-top: 15px;
+        }
+
+        .conclusion-actions h6 {
+            color: #E65100;
+            font-size: 1em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .conclusion-actions ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .conclusion-actions li {
+            color: #444;
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            line-height: 1.6;
+        }
+
+        .conclusion-actions li:before {
+            content: "▸";
+            color: #FFA726;
+            font-size: 1.2em;
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .chart-grid-item {
+            background: white;
+            border: 1px solid #BBDEFB;
+            border-radius: 10px;
+            padding: 12px;
+        }
+
+        .chart-grid-item h5 {
+            color: #1565C0;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .chart-grid-item canvas {
+            max-height: 150px !important;
+            height: 150px !important;
+        }
+
+        .charts-toggle-section {
+            margin-bottom: 20px;
+        }
+
+        .charts-toggle-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1em;
+            color: #1565C0;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .charts-toggle-btn:hover {
+            background: linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%);
+        }
+
+        .charts-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease;
+        }
+
+        .charts-content.open {
+            max-height: 3000px;
+            margin-top: 20px;
+            overflow-y: auto;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+
+        .ai-section {
+            background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%);
+            border-left: 5px solid #9C27B0;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .ai-enhance-btn {
+            background: linear-gradient(135deg, #9C27B0 0%, #AB47BC 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(156, 39, 176, 0.3);
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .ai-enhance-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(156, 39, 176, 0.4);
+        }
+
+        .ai-enhance-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .ai-result {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 2px solid #9C27B0;
+            line-height: 1.8;
+        }
+
+        .ai-result h6 {
+            color: #9C27B0;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #E1BEE7;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #9C27B0;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .api-config-section {
+            background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%);
+            border-left: 5px solid #9C27B0;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .api-config-section h4 {
+            color: #9C27B0;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+        }
+
+        .api-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .api-input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #9C27B0;
+            border-radius: 25px;
+            font-size: 1em;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .api-input:focus {
+            border-color: #7B1FA2;
+            box-shadow: 0 0 0 3px rgba(156, 39, 176, 0.1);
+        }
+
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-indicator.active {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .download-section {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px dashed #BBDEFB;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .download-section button {
+            min-width: 180px;
+        }
+
+        .insight-toggle {
+            cursor: pointer;
+        }
+
+        .insight-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .insight-content.open {
+            max-height: 1000px;
+            margin-top: 15px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        /* 개선된 AI 결과 스타일 */
+        .prime-analysis-result {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-top: 20px;
+            border: 2px solid #9C27B0;
+            box-shadow: 0 4px 20px rgba(156, 39, 176, 0.1);
+        }
+
+        .prime-analysis-result h2 {
+            color: #9C27B0;
+            font-size: 1.5em;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #E1BEE7;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 분석 결과 텍스트 위계 스타일 */
+        .analysis-h2 {
+            color: #7B1FA2;
+            font-size: 1.6em;
+            font-weight: 700;
+            margin-top: 35px;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #E1BEE7;
+            line-height: 1.4;
+        }
+
+        .analysis-h3 {
+            color: #8E24AA;
+            font-size: 1.35em;
+            font-weight: 600;
+            margin-top: 28px;
+            margin-bottom: 16px;
+            padding-left: 15px;
+            border-left: 5px solid #9C27B0;
+            line-height: 1.4;
+        }
+
+        .analysis-h4 {
+            color: #9C27B0;
+            font-size: 1.15em;
+            font-weight: 600;
+            margin-top: 22px;
+            margin-bottom: 14px;
+            padding-left: 12px;
+            border-left: 3px solid #BA68C8;
+            line-height: 1.5;
+        }
+
+        .analysis-h5 {
+            color: #AB47BC;
+            font-size: 1.05em;
+            font-weight: 600;
+            margin-top: 18px;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .analysis-p {
+            color: #333;
+            font-size: 1.02em;
+            line-height: 1.85;
+            margin-bottom: 14px;
+            text-align: justify;
+        }
+
+        /* 개선된 리스트 스타일 - 들여쓰기 강화 */
+        .analysis-ul, .analysis-ol {
+            margin: 16px 0;
+            padding-left: 30px;
+        }
+
+        .analysis-ul ul, .analysis-ol ol {
+            margin: 8px 0 8px 0;
+            padding-left: 30px;  /* 25px → 30px 증가 */
+        }
+
+        .analysis-ul ul ul, .analysis-ol ol ol {
+            margin: 6px 0 6px 0;
+            padding-left: 25px;
+        }
+
+        .analysis-li {
+            color: #444;
+            font-size: 1.0em;
+            line-height: 1.85;
+            margin-bottom: 10px;
+            padding-left: 8px;
+            position: relative;
+        }
+
+        .analysis-ul > .analysis-li {
+            list-style-type: disc;
+            color: #9C27B0;
+        }
+
+        .analysis-ul > .analysis-li::marker {
+            content: "● ";
+            color: #9C27B0;
+            font-size: 1.1em;
+        }
+
+        .analysis-ol > .analysis-li {
+            list-style-type: decimal;
+        }
+
+        .analysis-ol > .analysis-li::marker {
+            color: #9C27B0;
+            font-weight: 700;
+        }
+
+        /* 중첩 리스트 마커 변경 - 더 명확하게 */
+        .analysis-ul ul > .analysis-li::marker {
+            content: "○ ";
+            color: #BA68C8;
+            font-size: 1.0em;
+        }
+
+        .analysis-ul ul ul > .analysis-li::marker {
+            content: "▪ ";
+            color: #CE93D8;
+            font-size: 0.9em;
+        }
+
+        .prime-analysis-result strong {
+            color: #9C27B0;
+            font-weight: 600;
+        }
+
+        .prime-highlight-box {
+            background: linear-gradient(135deg, #F3E5F5 0%, #E1BEE7 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #9C27B0;
+        }
+
+        .prime-strategy-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 1px solid #E1BEE7;
+            box-shadow: 0 2px 8px rgba(156, 39, 176, 0.1);
+        }
+
+        .prime-strategy-card h5 {
+            color: #9C27B0;
+            font-size: 1.05em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        /* 파일 관리 섹션 스타일 */
+        .file-management-section {
+            background: white;
+            border: 2px solid #BBDEFB;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .file-management-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #E3F2FD;
+        }
+
+        .file-management-header h3 {
+            color: #1565C0;
+            font-size: 1.3em;
+            margin: 0;
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .file-item {
+            background: linear-gradient(135deg, #F5FBFF 0%, #E3F2FD 100%);
+            border: 1px solid #BBDEFB;
+            border-radius: 10px;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+        }
+
+        .file-item:hover {
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.15);
+        }
+
+        .file-item.active {
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            border: 2px solid #4A90E2;
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .file-icon {
+            font-size: 2em;
+        }
+
+        .file-details {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .file-name {
+            color: #1565C0;
+            font-weight: 600;
+            font-size: 1.05em;
+        }
+
+        .file-meta {
+            color: #666;
+            font-size: 0.85em;
+            display: flex;
+            gap: 15px;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .file-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .file-btn-select {
+            background: linear-gradient(135deg, #4A90E2 0%, #5CA7F7 100%);
+            color: white;
+        }
+
+        .file-btn-select:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+        }
+
+        .file-btn-delete {
+            background: linear-gradient(135deg, #EF5350 0%, #E53935 100%);
+            color: white;
+        }
+
+        .file-btn-delete:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 83, 80, 0.3);
+        }
+
+        .file-status-badge {
+            background: #4CAF50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+
+            .upload-section {
+                padding: 30px 20px;
+            }
+
+            .analysis-tabs {
+                flex-direction: column;
+            }
+
+            .tab-btn {
+                width: 100%;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-grid-item canvas {
+                max-height: 200px !important;
+                height: 200px !important;
+            }
+
+            .file-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .file-actions {
+                width: 100%;
+            }
+
+            .file-btn {
+                flex: 1;
+            }
+
+            .file-management-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .file-management-header button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 메타데이터 패턴 분석기</h1>
+            <p>상품 메타데이터의 숨겨진 패턴을 발견하세요</p>
+        </div>
+
+        <div class="content">
+            <!-- 파일 업로드 섹션 -->
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📁</div>
+                <h3>엑셀 또는 CSV 파일을 업로드하세요</h3>
+                <p>클릭하거나 파일을 드래그 앤 드롭하세요</p>
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+            </div>
+
+            <!-- 데이터 미리보기 -->
+            <div class="data-preview" id="dataPreview">
+                <div class="data-preview-header" onclick="toggleDataPreview()">
+                    <h3>📋 데이터 미리보기</h3>
+                    <span class="toggle-icon" id="previewToggleIcon">▼</span>
+                </div>
+                <div class="preview-content" id="previewContent">
+                    <div class="data-stats" id="dataStats"></div>
+                    <div class="table-container" id="tableContainer"></div>
+                </div>
+            </div>
+
+            <!-- 업로드된 파일 관리 -->
+            <div class="file-management-section" id="fileManagementSection" style="display: none;">
+                <div class="file-management-header">
+                    <h3>📂 업로드된 파일 관리</h3>
+                    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="font-size: 0.9em; padding: 8px 20px;">
+                        ➕ 파일 추가
+                    </button>
+                </div>
+                <div class="file-list" id="fileList"></div>
+            </div>
+
+            <!-- Gemini API 설정 -->
+            <div class="api-config-section" id="apiConfigSection" style="display: none;">
+                <h4>🤖 AI 분석 향상</h4>
+                
+                <!-- API 입력 영역 -->
+                <div id="apiInputArea">
+                    <div class="api-input-group">
+                        <input type="password" 
+                               class="api-input" 
+                               id="geminiApiKey" 
+                               placeholder="Gemini API 키 입력 (예: AIzaSy...)"
+                               onchange="saveApiKey()">
+                        <button class="btn btn-secondary" onclick="saveApiKey()" style="white-space: nowrap;">
+                            연결하기
+                        </button>
+                    </div>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 10px; line-height: 1.6;">
+                        💡 <strong>API 키 발급 방법:</strong><br>
+                        1. <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #9C27B0;">Google AI Studio</a> 접속<br>
+                        2. "Create API key" 클릭<br>
+                        3. 프로젝트 선택 또는 생성 (예: pattern-analysis)<br>
+                        4. 생성된 API 키 복사 후 위에 입력<br>
+                        <br>
+                        ✨ <strong>무료 한도:</strong> Gemini 1.5 Flash (분당 15회, 일일 1,500회)<br>
+                        🔒 API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다.
+                    </p>
+                </div>
+                
+                <!-- API 상태 영역 -->
+                <div id="apiStatusArea" style="display: none;">
+                    <div class="api-status">
+                        <span class="status-indicator active" id="apiStatusIndicator"></span>
+                        <span id="apiStatusText" style="color: #4CAF50; font-weight: 600;">API 연결됨</span>
+                        <button class="btn" onclick="disconnectApi()" style="margin-left: auto; font-size: 0.9em; padding: 8px 16px;">
+                            연결 해제
+                        </button>
+                    </div>
+                    <p style="color: #666; font-size: 0.85em; margin-top: 10px;">
+                        ✨ 각 분석 페이지에서 <strong>"AI로 분석 향상하기"</strong> 버튼을 클릭하세요.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 분석 탭 -->
+            <div class="analysis-tabs" id="analysisTabs" style="display: none;">
+                <button class="tab-btn active" data-tab="frequency">📈 기본 빈도 분석</button>
+                <button class="tab-btn" data-tab="combination">🔗 조합 패턴 분석</button>
+                <button class="tab-btn" data-tab="association">🎯 연관 규칙 분석</button>
+                <button class="tab-btn" data-tab="visual">🗺️ 비주얼 맵핑</button>
+            </div>
+
+            <!-- 분석 결과 섹션들 -->
+            <div id="analysisResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let charts = {};
+        let geminiApiKey = localStorage.getItem('geminiApiKey') || '';
+        let uploadedFiles = []; // 업로드된 파일 목록
+        let currentFileIndex = 0; // 현재 분석 중인 파일 인덱스
+        
+        // AI 분석 결과 저장소 (탭 전환해도 유지)
+        let aiAnalysisCache = {
+            frequency: null,
+            combination: null,
+            association: null,
+            visual: null
+        };
+
+        // API 키 저장 및 상태 업데이트
+        async function saveApiKey() {
+            const input = document.getElementById('geminiApiKey');
+            const apiKey = input.value.trim();
+            
+            if (!apiKey) {
+                alert('API 키를 입력해주세요.');
+                return;
+            }
+            
+            // API 키 테스트
+            const testBtn = event.target;
+            const originalText = testBtn.textContent;
+            testBtn.disabled = true;
+            testBtn.textContent = '연결 테스트 중...';
+            
+            const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
+            let success = false;
+            let workingModel = null;
+            
+            for (const model of models) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{
+                                    text: '안녕'
+                                }]
+                            }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                maxOutputTokens: 10,
+                            }
+                        })
+                    });
+
+                    if (response.ok) {
+                        success = true;
+                        workingModel = model;
+                        break;
+                    }
+                } catch (error) {
+                    continue;
+                }
+            }
+            
+            testBtn.disabled = false;
+            testBtn.textContent = originalText;
+            
+            if (success) {
+                // 성공 시 저장
+                geminiApiKey = apiKey;
+                localStorage.setItem('geminiApiKey', geminiApiKey);
+                updateApiStatus(true);
+                
+                // UI 전환
+                document.getElementById('apiInputArea').style.display = 'none';
+                document.getElementById('apiStatusArea').style.display = 'block';
+                
+                alert(`✅ API 연결 성공!\n\n사용 모델: ${workingModel}\n\n이제 각 분석에서 "AI로 분석 향상하기" 버튼을 사용할 수 있습니다.`);
+            } else {
+                alert(`❌ API 연결 실패\n\n모든 모델 연결에 실패했습니다.\n\n해결 방법:\n1. Google Cloud Console (console.cloud.google.com) 접속\n2. 프로젝트 선택 (pattern-analysis)\n3. "API 및 서비스" → "라이브러리"\n4. "Generative Language API" 검색 후 활성화\n5. 새 API 키 발급 후 재시도`);
+            }
+        }
+
+        function disconnectApi() {
+            if (confirm('API 연결을 해제하시겠습니까?')) {
+                geminiApiKey = '';
+                localStorage.removeItem('geminiApiKey');
+                document.getElementById('geminiApiKey').value = '';
+                
+                // UI 전환
+                document.getElementById('apiInputArea').style.display = 'block';
+                document.getElementById('apiStatusArea').style.display = 'none';
+                
+                updateApiStatus(false);
+            }
+        }
+
+        function updateApiStatus(isActive) {
+            const indicator = document.getElementById('apiStatusIndicator');
+            const text = document.getElementById('apiStatusText');
+            
+            if (isActive) {
+                indicator.classList.add('active');
+                text.textContent = 'API 연결됨';
+                text.style.color = '#4CAF50';
+            } else {
+                indicator.classList.remove('active');
+                text.textContent = 'API 미연결';
+                text.style.color = '#666';
+            }
+        }
+
+        // 페이지 로드 시 API 키 복원
+        window.addEventListener('load', () => {
+            if (geminiApiKey) {
+                document.getElementById('geminiApiKey').value = geminiApiKey;
+                document.getElementById('apiInputArea').style.display = 'none';
+                document.getElementById('apiStatusArea').style.display = 'block';
+                updateApiStatus(true);
+            }
+        });
+
+        // 데이터 미리보기 토글
+        function toggleDataPreview() {
+            const content = document.getElementById('previewContent');
+            const icon = document.getElementById('previewToggleIcon');
+            content.classList.toggle('open');
+            icon.classList.toggle('open');
+        }
+
+        // Gemini API 호출 (여러 모델 시도)
+        async function callGeminiAPI(prompt) {
+            if (!geminiApiKey) {
+                alert('Gemini API 키를 먼저 입력해주세요.');
+                return null;
+            }
+
+            // 시도할 모델 목록 (2025년 최신 모델)
+            const models = [
+                'gemini-2.5-flash',
+                'gemini-2.0-flash',
+                'gemini-2.5-pro'
+            ];
+
+            let lastError = null;
+
+            for (const model of models) {
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{
+                                    text: prompt
+                                }]
+                            }],
+                            generationConfig: {
+                                temperature: 0.3,  // 0.7 → 0.3 (일관성 향상)
+                                maxOutputTokens: 8000,  // 3000 → 8000 (끊김 방지)
+                            }
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        
+                        if (!data.candidates || !data.candidates[0]) {
+                            throw new Error('API 응답이 올바르지 않습니다.');
+                        }
+                        
+                        return data.candidates[0].content.parts[0].text;
+                    }
+
+                    lastError = await response.json().catch(() => ({}));
+                    
+                } catch (error) {
+                    lastError = error;
+                    continue; // 다음 모델 시도
+                }
+            }
+
+            // 모든 모델 실패
+            console.error('모든 모델 시도 실패:', lastError);
+            alert(`AI 분석 오류\n\n모든 모델 연결 실패. API 설정을 확인해주세요.\n\n해결 방법:\n1. Google AI Studio에서 "Generative Language API" 활성화\n2. API 키 재생성\n3. 브라우저 콘솔(F12)에서 상세 오류 확인`);
+            return null;
+        }
+
+        // 파일 업로드 이벤트
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadSection.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileUpload);
+
+        // 드래그 앤 드롭
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                    
+                    // 파일 정보 저장
+                    const fileInfo = {
+                        name: file.name,
+                        size: file.size,
+                        uploadTime: new Date().toLocaleString('ko-KR'),
+                        data: jsonData,
+                        rowCount: jsonData.length,
+                        columnCount: Object.keys(jsonData[0] || {}).length
+                    };
+                    
+                    uploadedFiles.push(fileInfo);
+                    currentFileIndex = uploadedFiles.length - 1;
+                    currentData = jsonData;
+                    
+                    // UI 업데이트
+                    updateFileList();
+                    displayDataPreview(jsonData);
+                    initializeAnalysis();
+                    
+                    // 파일 관리 섹션 표시
+                    document.getElementById('fileManagementSection').style.display = 'block';
+                } catch (error) {
+                    alert('파일을 읽는 중 오류가 발생했습니다: ' + error.message);
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 파일 목록 업데이트
+        function updateFileList() {
+            const fileListDiv = document.getElementById('fileList');
+            
+            if (uploadedFiles.length === 0) {
+                fileListDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">업로드된 파일이 없습니다.</p>';
+                return;
+            }
+            
+            fileListDiv.innerHTML = '';
+            
+            uploadedFiles.forEach((file, index) => {
+                const isActive = index === currentFileIndex;
+                const fileItem = document.createElement('div');
+                fileItem.className = `file-item ${isActive ? 'active' : ''}`;
+                
+                fileItem.innerHTML = `
+                    <div class="file-info">
+                        <div class="file-icon">📊</div>
+                        <div class="file-details">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">
+                                <span>📦 ${file.rowCount}행 × ${file.columnCount}열</span>
+                                <span>📅 ${file.uploadTime}</span>
+                                <span>💾 ${formatFileSize(file.size)}</span>
+                            </div>
+                        </div>
+                        ${isActive ? '<span class="file-status-badge">분석 중</span>' : ''}
+                    </div>
+                    <div class="file-actions">
+                        ${!isActive ? `<button class="file-btn file-btn-select" onclick="selectFile(${index})">선택</button>` : ''}
+                        <button class="file-btn file-btn-delete" onclick="deleteFile(${index})">삭제</button>
+                    </div>
+                `;
+                
+                fileListDiv.appendChild(fileItem);
+            });
+        }
+
+        // 파일 크기 포맷팅
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // 파일 선택
+        function selectFile(index) {
+            if (index < 0 || index >= uploadedFiles.length) return;
+            
+            currentFileIndex = index;
+            currentData = uploadedFiles[index].data;
+            
+            // UI 업데이트
+            updateFileList();
+            displayDataPreview(currentData);
+            
+            // 분석 초기화
+            document.getElementById('analysisTabs').style.display = 'flex';
+            showAnalysis('frequency');
+            
+            // 알림
+            alert(`"${uploadedFiles[index].name}" 파일로 전환되었습니다.`);
+        }
+
+        // 파일 삭제
+        function deleteFile(index) {
+            if (index < 0 || index >= uploadedFiles.length) return;
+            
+            const fileName = uploadedFiles[index].name;
+            
+            if (!confirm(`"${fileName}" 파일을 삭제하시겠습니까?`)) {
+                return;
+            }
+            
+            // 파일 삭제
+            uploadedFiles.splice(index, 1);
+            
+            // 현재 파일 인덱스 조정
+            if (uploadedFiles.length === 0) {
+                // 모든 파일 삭제됨
+                currentFileIndex = 0;
+                currentData = null;
+                
+                // UI 초기화
+                document.getElementById('fileManagementSection').style.display = 'none';
+                document.getElementById('dataPreview').style.display = 'none';
+                document.getElementById('apiConfigSection').style.display = 'none';
+                document.getElementById('analysisTabs').style.display = 'none';
+                document.getElementById('analysisResults').innerHTML = '';
+                
+                alert('모든 파일이 삭제되었습니다.');
+            } else {
+                // 다른 파일이 남아있음
+                if (index === currentFileIndex) {
+                    // 삭제된 파일이 현재 선택된 파일인 경우
+                    currentFileIndex = Math.max(0, index - 1);
+                    currentData = uploadedFiles[currentFileIndex].data;
+                    
+                    displayDataPreview(currentData);
+                    showAnalysis('frequency');
+                    
+                    alert(`"${fileName}" 파일이 삭제되었습니다.\n"${uploadedFiles[currentFileIndex].name}" 파일로 전환됩니다.`);
+                } else if (index < currentFileIndex) {
+                    // 삭제된 파일이 현재 파일보다 앞에 있는 경우
+                    currentFileIndex--;
+                }
+                
+                updateFileList();
+            }
+        }
+
+        function displayDataPreview(data) {
+            const previewSection = document.getElementById('dataPreview');
+            const statsDiv = document.getElementById('dataStats');
+            const tableDiv = document.getElementById('tableContainer');
+
+            // 통계 표시
+            const columns = Object.keys(data[0]);
+            statsDiv.innerHTML = `
+                <div class="stat-box">
+                    <strong>${data.length}</strong> 개의 상품
+                </div>
+                <div class="stat-box">
+                    <strong>${columns.length}</strong> 개의 메타데이터
+                </div>
+            `;
+
+            // 테이블 생성 (상위 10개만)
+            const previewData = data.slice(0, 10);
+            let tableHTML = '<table><thead><tr>';
+            columns.forEach(col => {
+                tableHTML += `<th>${col}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+
+            previewData.forEach(row => {
+                tableHTML += '<tr>';
+                columns.forEach(col => {
+                    tableHTML += `<td>${row[col] || '-'}</td>`;
+                });
+                tableHTML += '</tr>';
+            });
+            tableHTML += '</tbody></table>';
+
+            tableDiv.innerHTML = tableHTML;
+            previewSection.style.display = 'block';
+            
+            // API 설정 섹션 표시
+            document.getElementById('apiConfigSection').style.display = 'block';
+        }
+
+        function initializeAnalysis() {
+            document.getElementById('analysisTabs').style.display = 'flex';
+            
+            // 탭 클릭 이벤트
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    const tab = btn.dataset.tab;
+                    showAnalysis(tab);
+                });
+            });
+
+            // 첫 번째 분석 표시
+            showAnalysis('frequency');
+        }
+
+        function showAnalysis(type) {
+            const resultsDiv = document.getElementById('analysisResults');
+            
+            // 기존 차트 제거
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+
+            switch(type) {
+                case 'frequency':
+                    resultsDiv.innerHTML = generateFrequencyAnalysis();
+                    break;
+                case 'combination':
+                    resultsDiv.innerHTML = generateCombinationAnalysis();
+                    break;
+                case 'association':
+                    resultsDiv.innerHTML = generateAssociationAnalysis();
+                    break;
+                case 'visual':
+                    resultsDiv.innerHTML = generateVisualMapping();
+                    break;
+            }
+
+            // 토글 이벤트 추가
+            document.querySelectorAll('.explanation-toggle').forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    const icon = this.querySelector('.toggle-icon');
+                    content.classList.toggle('open');
+                    icon.classList.toggle('open');
+                });
+            });
+        }
+
+        // 빈도 계산 함수
+        function calculateFrequency(column) {
+            const freq = {};
+            currentData.forEach(row => {
+                const value = row[column];
+                freq[value] = (freq[value] || 0) + 1;
+            });
+            return freq;
+        }
+
+        // ===== 통일된 프롬프트 구조 상수 =====
+        const UNIFIED_PROMPT_STRUCTURE = `
+## 🚨 작성 규칙 (절대 규칙 - 100% 준수!)
+
+**마크다운 형식 필수:**
+- 대제목: ## (H2)
+- 중제목: ### (H3)
+- 소제목: #### (H4)
+- 강조: **텍스트**
+- 리스트: - 사용 (반드시!)
+- **🚨 하위 항목은 반드시 정확히 공백 2개로 들여쓰기!**
+
+**들여쓰기 예시 (정확히 이렇게!):**
+
+#### 발견 1: 제목
+- **왜 중요한가요?**
+  - 상위 10개 중 70%가 캐릭터 기반입니다 (공백 2개!)
+  - 70%가 귀여운 성격을 가지며 80%가 정적 콘텐츠입니다 (공백 2개!)
+- **어떻게 활용하나요?**
+  - 캐릭터를 전면에 배치하세요 (공백 2개!)
+  - 정적 콘텐츠로 안정감을 주세요 (공백 2개!)
+
+**톤 & 스타일:**
+- 20~30대 크리에이터 타겟
+- 친근한 뉴스레터 스타일
+- 짧은 문단 (2~4줄)
+- 이모지 적극 활용
+
+**🚨 절대 규칙:**
+1. 모든 섹션을 반드시 완성하세요 (절대 중간에 끊으면 안됨!)
+2. 하위 항목은 정확히 공백 2개로 들여쓰기
+3. 요청한 개수만큼 정확히 작성 (TOP 3이면 3개, TOP 5면 5개)
+4. 각 항목마다 구체적인 숫자와 예시 포함
+`;
+
+        // ===== 개선된 AI 분석 함수들 (통일된 구조) =====
+
+        async function enhanceFrequencyWithAI() {
+            const btn = document.getElementById('frequencyAiBtn');
+            const resultDiv = document.getElementById('frequencyAiResult');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>분석 중... (30초~1분 소요)';
+            
+            // 데이터 준비
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            );
+            
+            let analysisData = '## 분석 데이터\n\n';
+            columns.forEach(col => {
+                const freq = calculateFrequency(col);
+                const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+                analysisData += `### ${col}\n`;
+                sorted.slice(0, 5).forEach(([key, val]) => {
+                    analysisData += `- ${key}: ${val}개 (${((val/currentData.length)*100).toFixed(1)}%)\n`;
+                });
+                analysisData += `- 총 ${Object.keys(freq).length}개의 고유값\n\n`;
+            });
+
+            const prompt = `# 빈도 분석 과제
+
+아래는 상위 10개 상품의 메타데이터 빈도 분석 데이터입니다:
+
+${analysisData}
+
+이 데이터를 바탕으로 **실무에서 바로 써먹을 수 있는 콘텐츠 제작 전략**을 작성해주세요.
+
+${UNIFIED_PROMPT_STRUCTURE}
+
+## 필수 포함 섹션 (정확히 이 구조로!)
+
+### 🎯 핵심 요약
+전체 분석의 가장 중요한 인사이트를 3~5줄로 요약
+
+### 🔥 주요 발견 TOP 3 (정확히 3개!)
+
+각 발견마다 아래 구조 사용:
+
+#### 발견 1: [제목]
+- **왜 중요한가요?**
+  - 데이터 근거 설명 (공백 2개!)
+  - 구체적 수치 포함 (공백 2개!)
+- **어떻게 활용하나요?**
+  - 실전 적용 방법 1 (공백 2개!)
+  - 실전 적용 방법 2 (공백 2개!)
+- **주의할 점**
+  - 함정/실수 방지 팁 (공백 2개!)
+
+#### 발견 2: [제목]
+(동일한 구조로)
+
+#### 발견 3: [제목]
+(동일한 구조로)
+
+### 💡 실행 전략
+
+#### 지금 당장 해야 할 것 ✅
+- 실행 항목 1
+  - 구체적 방법 (공백 2개!)
+- 실행 항목 2
+  - 구체적 방법 (공백 2개!)
+
+#### 절대 피해야 할 것 ⚠️
+- 피할 패턴 1
+  - 이유 (공백 2개!)
+- 피할 패턴 2
+  - 이유 (공백 2개!)
+
+### 📈 3단계 실행 플랜
+
+#### 1단계: 오늘 바로 (30분 이내)
+- 즉시 실행 항목 1
+  - 구체적 방법 (공백 2개!)
+- 즉시 실행 항목 2
+  - 구체적 방법 (공백 2개!)
+
+#### 2단계: 이번 주 안에
+- 단기 실행 항목 1
+  - 구체적 방법 (공백 2개!)
+- 단기 실행 항목 2
+  - 구체적 방법 (공백 2개!)
+
+#### 3단계: 다음 달까지
+- 장기 준비 항목 1
+  - 구체적 방법 (공백 2개!)
+- 장기 준비 항목 2
+  - 구체적 방법 (공백 2개!)
+
+🚨 **매우 중요**: 
+- 모든 섹션을 반드시 완성하세요!
+- 하위 항목은 정확히 공백 2개로 들여쓰기!
+- TOP 3이므로 발견을 정확히 3개 작성!
+
+마크다운 형식으로 작성해주세요.`;
+
+            const result = await callGeminiAPI(prompt);
+            
+            if (result) {
+                const formattedResult = `<div class="prime-analysis-result">${formatMarkdown(result)}</div>`;
+                
+                // 결과를 캐시에 저장
+                aiAnalysisCache.frequency = formattedResult;
+                
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = formattedResult;
+                
+                // 결론 박스 업데이트
+                document.getElementById('frequencyConclusion').innerHTML = generateFrequencyConclusion();
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '✨ 다시 분석하기';
+        }
+
+        async function enhanceCombinationWithAI() {
+            const btn = document.getElementById('combinationAiBtn');
+            const resultDiv = document.getElementById('combinationAiResult');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>분석 중...';
+            
+            // 데이터 준비
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            );
+            const combinations = findTopCombinations(columns, 2);
+            
+            let analysisData = '## 조합 패턴 데이터\n\n';
+            combinations.slice(0, 15).forEach((combo, idx) => {
+                analysisData += `${idx + 1}. ${combo.pattern}: ${combo.count}회 (${((combo.count/currentData.length)*100).toFixed(1)}%)\n`;
+            });
+
+            const prompt = `# 데이터 분석 과제
+
+아래는 상위 10개 상품의 **메타데이터 조합 패턴** 분석 데이터입니다:
+
+${analysisData}
+
+이 데이터를 바탕으로 **실무에서 바로 써먹을 수 있는 콘텐츠 제작 전략**을 작성해주세요.
+
+## 작성 규칙 (매우 중요!)
+
+**마크다운 형식:**
+- 대제목: ## (H2)
+- 중제목: ### (H3)
+- 소제목: #### (H4)
+- 강조: **텍스트**
+- 리스트: - 또는 1. 사용
+- **들여쓰기: 하위 항목은 반드시 공백 2개로 들여쓰기!**
+
+**구조 예시:**
+
+### 제목
+- 상위 항목
+  - 하위 상세 1 (공백 2개 들여쓰기!)
+  - 하위 상세 2
+
+
+**톤 & 스타일:**
+- 20대 뉴스레터 스타일
+- 짧은 문단 (2~4줄)
+- 이모지 적극 활용
+
+## 필수 포함 섹션 (아래 구조 정확히 따르기)
+
+### 🔗 조합 패턴 핵심 요약
+(TOP 3 조합을 소개하고 왜 자주 나타나는지 3~4줄 설명)
+
+### 🎯 성공 조합 분석 (최소 3개)
+
+각 조합마다 아래 구조 사용:
+
+#### 조합 1: [조합 이름]
+- **왜 성공했나요?**
+  - 성공 이유 분석 (2~3줄)
+  - 데이터 근거
+- **누구에게 효과적인가요?**
+  - 타겟 고객과 니즈 (2~3줄)
+- **어떻게 적용하죠?**
+  - 구체적 적용 방법 (2~3줄)
+  - 실전 예시
+
+### ⚠️ 피해야 할 조합
+- 실패 조합 1
+  - 왜 안 좋은지 이유
+- 실패 조합 2
+  - 왜 안 좋은지 이유
+
+### 💡 조합 활용 전략
+
+#### 검증된 조합 따라하기
+- 안전한 방법 1
+  - 구체적 설명
+- 안전한 방법 2
+  - 구체적 설명
+
+#### 새로운 조합 실험하기
+- 테스트 방법 1
+  - A/B 테스트 아이디어
+- 테스트 방법 2
+  - 리스크 관리
+
+### 📈 3단계 실행 플랜
+
+#### 1단계: 오늘 바로
+- 즉시 실행 항목
+
+#### 2단계: 이번 주 안에
+- 단기 실행 항목
+
+#### 3단계: 다음 달까지
+- 장기 준비 항목
+
+**중요: 모든 하위 항목은 반드시 공백 2개로 들여쓰기 하세요!**
+마크다운 형식으로 작성해주세요.`;
+
+            const result = await callGeminiAPI(prompt);
+            
+            if (result) {
+                const formattedResult = `<div class="prime-analysis-result">${formatMarkdown(result)}</div>`;
+                aiAnalysisCache.combination = formattedResult;
+                
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = formattedResult;
+                
+                document.getElementById('combinationConclusion').innerHTML = generateCombinationConclusion(combinations);
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '✨ 다시 분석하기';
+        }
+
+        async function enhanceAssociationWithAI() {
+            const btn = document.getElementById('associationAiBtn');
+            const resultDiv = document.getElementById('associationAiResult');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>분석 중...';
+            
+            const rules = calculateAssociationRules();
+            
+            let analysisData = '## 연관 규칙 데이터\n\n';
+            rules.slice(0, 10).forEach((rule, idx) => {
+                analysisData += `${idx + 1}. ${rule.rule}\n`;
+                analysisData += `   - 신뢰도: ${(rule.confidence * 100).toFixed(1)}% (A가 있으면 B가 있을 확률)\n`;
+                analysisData += `   - 지지도: ${(rule.support * 100).toFixed(1)}% (전체 중 A와 B가 함께 나타나는 비율)\n\n`;
+            });
+
+            const prompt = `# 데이터 분석 과제
+
+아래는 상위 10개 상품의 **메타데이터 연관 규칙** 분석 데이터입니다:
+
+${analysisData}
+
+**연관 규칙이란?** "A를 선택하면 → B도 함께 선택된다"는 패턴이에요.
+- **신뢰도**: A가 있을 때 B가 나타날 확률 (높을수록 강력)
+- **지지도**: 전체에서 A+B가 함께 나타나는 비율
+
+이 데이터를 바탕으로 **실무에서 바로 써먹을 수 있는 전략**을 작성해주세요.
+
+## 🚨 작성 규칙 (절대 규칙 - 반드시 따르기!)
+
+**마크다운 형식 필수:**
+- 대제목: ## (H2)
+- 중제목: ### (H3)
+- 소제목: #### (H4)
+- 강조: **텍스트**
+- 리스트: - 사용
+- **🚨 하위 항목은 반드시 앞에 공백 2개 넣기!**
+
+**들여쓰기 예시 (정확히 이렇게!):**
+
+#### 규칙 1: 텍스트 포함 "정치형" → 콘텐츠 유형="정치형"
+- **왜 강력한가요?**
+  - 신뢰도 100%, 지지도 70%로 매우 강력한 규칙입니다
+  - 텍스트에 정치형이 들어가면 콘텐츠 유형도 정치형일 확률이 100%
+- **실전 활용법**
+  - 제목에 정치 키워드 사용시 콘텐츠 유형을 정치형으로 설정
+  - 타겟 독자를 정치 관심층으로 명확히 설정
+- **예상 결과**
+  - 클릭률 30% 향상 예상
+
+
+**🚨 위 예시처럼 하위 내용은 반드시 공백 2개로 들여쓰기!**
+
+**톤 & 스타일:**
+- 20대 뉴스레터 스타일
+- 짧은 문단 (2~4줄)
+- 이모지 적극 활용
+
+## 필수 포함 섹션 (정확히 이 구조로!)
+
+### 🎯 강력한 규칙 TOP 3
+(각 규칙을 소개하고 신뢰도가 의미하는 것을 2~3줄로 설명)
+
+### 💎 규칙별 깊이 분석 (최소 3개)
+
+🚨 각 규칙마다 아래 구조를 정확히 사용하세요:
+
+#### 규칙 1: [실제 규칙 내용]
+- **왜 강력한가요?**
+  - 첫 번째 이유 (공백 2개 들여쓰기!)
+  - 두 번째 이유 (공백 2개 들여쓰기!)
+- **실전 활용법**
+  - 적용 방법 1 (공백 2개 들여쓰기!)
+  - 적용 방법 2 (공백 2개 들여쓰기!)
+- **예상 결과**
+  - 기대 효과 (공백 2개 들여쓰기!)
+
+#### 규칙 2: [실제 규칙 내용]
+- **왜 강력한가요?**
+  - 첫 번째 이유 (공백 2개 들여쓰기!)
+  - 두 번째 이유 (공백 2개 들여쓰기!)
+- **실전 활용법**
+  - 적용 방법 1 (공백 2개 들여쓰기!)
+  - 적용 방법 2 (공백 2개 들여쓰기!)
+- **예상 결과**
+  - 기대 효과 (공백 2개 들여쓰기!)
+
+#### 규칙 3: [실제 규칙 내용]
+- **왜 강력한가요?**
+  - 첫 번째 이유 (공백 2개 들여쓰기!)
+  - 두 번째 이유 (공백 2개 들여쓰기!)
+- **실전 활용법**
+  - 적용 방법 1 (공백 2개 들여쓰기!)
+  - 적용 방법 2 (공백 2개 들여쓰기!)
+- **예상 결과**
+  - 기대 효과 (공백 2개 들여쓰기!)
+
+### 📋 필수 체크리스트
+- A를 선택했다면 → B도 넣으세요
+  - 이유 설명 (공백 2개!)
+- C를 선택했다면 → D도 넣으세요
+  - 이유 설명 (공백 2개!)
+- E를 선택했다면 → F도 넣으세요
+  - 이유 설명 (공백 2개!)
+
+### ⚠️ 주의사항
+- 낮은 신뢰도 규칙 다루는 법
+  - 구체적 방법 (공백 2개!)
+- 데이터 적을 때 주의점
+  - 구체적 방법 (공백 2개!)
+- 흔한 실수들
+  - 예방 방법 (공백 2개!)
+
+### 💡 콘텐츠 제작 가이드
+
+#### 규칙 기반 구성법
+- 방법 1
+  - 구체적 설명 (공백 2개!)
+- 방법 2
+  - 구체적 설명 (공백 2개!)
+
+### 📈 3단계 실행 플랜
+
+#### 1단계: 오늘 바로
+- 즉시 실행 항목
+  - 구체적 방법 (공백 2개!)
+
+#### 2단계: 이번 주 안에
+- 단기 실행 항목
+  - 구체적 방법 (공백 2개!)
+
+#### 3단계: 다음 달까지
+- 장기 준비 항목
+  - 구체적 방법 (공백 2개!)
+
+🚨🚨🚨 절대 규칙: 모든 하위 상세 내용 앞에는 공백 2개를 반드시 넣으세요! 🚨🚨🚨
+마크다운 형식으로 작성해주세요.`;
+
+            const result = await callGeminiAPI(prompt);
+            
+            if (result) {
+                const formattedResult = `<div class="prime-analysis-result">${formatMarkdown(result)}</div>`;
+                aiAnalysisCache.association = formattedResult;
+                
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = formattedResult;
+                
+                document.getElementById('associationConclusion').innerHTML = generateAssociationConclusion(rules);
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '✨ 다시 분석하기';
+        }
+
+        async function enhanceVisualWithAI() {
+            const btn = document.getElementById('visualAiBtn');
+            const resultDiv = document.getElementById('visualAiResult');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span>분석 중...';
+            
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            );
+            
+            let analysisData = '## 메타데이터 다양성 분석\n\n';
+            columns.forEach(col => {
+                const freq = calculateFrequency(col);
+                const uniqueCount = Object.keys(freq).length;
+                analysisData += `- ${col}: ${uniqueCount}개의 고유값 (다양성 지수)\n`;
+            });
+
+            const prompt = `# 데이터 분석 과제
+
+아래는 상위 10개 상품의 **메타데이터 다양성** 분석 데이터입니다:
+
+${analysisData}
+
+**다양성 지수란?** 각 메타데이터가 얼마나 다양한 값을 가지는지 보여주는 숫자예요.
+- **높은 다양성** = 선택지 많음 = 차별화 기회 많음
+- **낮은 다양성** = 선택지 적음 = 이미 검증된 성공 공식
+
+이 데이터로 **실전에서 바로 쓸 수 있는 전략**을 만들어주세요.
+
+## 작성 규칙 (매우 중요!)
+
+**마크다운 형식:**
+- 대제목: ## (H2)
+- 중제목: ### (H3)
+- 소제목: #### (H4)
+- 강조: **텍스트**
+- 리스트: - 또는 1. 사용
+- **들여쓰기: 하위 항목은 반드시 공백 2개로 들여쓰기!**
+
+**구조 예시:**
+
+### 제목
+- 상위 항목
+  - 하위 상세 1 (공백 2개 들여쓰기!)
+  - 하위 상세 2
+
+
+**톤 & 스타일:**
+- 20대 뉴스레터 스타일
+- 짧은 문단 (2~4줄)
+- 이모지 적극 활용
+
+## 필수 포함 섹션 (아래 구조 정확히 따르기)
+
+### 🗺️ 다양성 지도 읽기
+
+#### 가장 다양한 것들 TOP 3
+- 항목 1 (N개 고유값)
+  - 왜 다양한지 (2~3줄)
+  - 의미하는 것
+- 항목 2 (N개 고유값)
+  - 왜 다양한지
+  - 의미하는 것
+- 항목 3 (N개 고유값)
+  - 왜 다양한지
+  - 의미하는 것
+
+#### 가장 집중된 것들 TOP 3
+- 항목 1 (N개 고유값)
+  - 왜 집중됐는지 (2~3줄)
+  - 의미하는 것
+- 항목 2 (N개 고유값)
+  - 왜 집중됐는지
+  - 의미하는 것
+- 항목 3 (N개 고유값)
+  - 왜 집중됐는지
+  - 의미하는 것
+
+### 💎 다양성으로 차별화하기
+
+#### 높은 다양성 활용법
+- 틈새 시장 공략
+  - 구체적 방법 (2~3줄)
+  - 예시
+- 새로운 조합 실험
+  - 테스트 아이디어 (2~3줄)
+  - 리스크 관리
+- 실전 적용 사례
+  - 구체적 예시 (2~3줄)
+
+### ✅ 검증된 패턴으로 안전하게
+
+#### 낮은 다양성 활용법
+- 성공 패턴 따라하기
+  - 어떤 패턴을 어떻게 (2~3줄)
+  - 체크리스트
+- 리스크 줄이는 전략
+  - 안전하게 가는 법 (2~3줄)
+  - 주의사항
+
+### 📊 균형 잡힌 콘텐츠 전략
+
+#### 최적 비율 제안
+- 집중 메타데이터 (안정성): 60%
+  - 이유 (1~2줄)
+- 다양 메타데이터 (차별성): 40%
+  - 이유 (1~2줄)
+
+### 💡 단계별 실전 전략
+
+#### 시장 진입 초기 (안정 우선)
+- 비율: 검증된 것 80% + 실험 20%
+- 이유
+  - 설명 (2~3줄)
+- 구체적 방법
+  - 실행법
+
+#### 성장 단계 (균형)
+- 비율: 50:50
+- 이유
+  - 설명 (2~3줄)
+- 구체적 방법
+  - 실행법
+
+#### 차별화 단계 (실험 우선)
+- 비율: 실험 70% + 안정 30%
+- 이유
+  - 설명 (2~3줄)
+- 구체적 방법
+  - 실행법
+
+### 📈 3단계 실행 플랜
+
+#### 1단계: 오늘 바로
+- 즉시 실행 항목
+
+#### 2단계: 이번 주 안에
+- 단기 실행 항목
+
+#### 3단계: 다음 달까지
+- 장기 준비 항목
+
+**중요: 모든 하위 항목은 반드시 공백 2개로 들여쓰기 하세요!**
+마크다운 형식으로 작성해주세요.`;
+
+            const result = await callGeminiAPI(prompt);
+            
+            if (result) {
+                const formattedResult = `<div class="prime-analysis-result">${formatMarkdown(result)}</div>`;
+                aiAnalysisCache.visual = formattedResult;
+                
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = formattedResult;
+                
+                document.getElementById('visualConclusion').innerHTML = generateVisualConclusion([]);
+            }
+            
+            btn.disabled = false;
+            btn.innerHTML = '✨ 다시 분석하기';
+        }
+
+        // 마크다운을 HTML로 변환하는 함수 (개선 버전)
+        function formatMarkdown(text) {
+            // 1단계: 프롬프트 지시문 제거
+            text = removePromptInstructions(text);
+            
+            // 2단계: 리스트 먼저 처리 (다른 변환 전에)
+            text = parseMarkdownLists(text);
+            
+            // 3단계: 헤딩과 Bold 처리
+            text = text
+                // H2 (대제목)
+                .replace(/^##\s+(.+)$/gim, '<h2 class="analysis-h2">$1</h2>')
+                // H3 (중제목)
+                .replace(/^###\s+(.+)$/gim, '<h3 class="analysis-h3">$1</h3>')
+                // H4 (소제목)
+                .replace(/^####\s+(.+)$/gim, '<h4 class="analysis-h4">$1</h4>')
+                // H5 (더 작은 제목)
+                .replace(/^#####\s+(.+)$/gim, '<h5 class="analysis-h5">$1</h5>')
+                // Bold
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            
+            // 4단계: 단락 처리
+            const lines = text.split('\n');
+            let html = [];
+            let inBlock = false;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                // 빈 줄
+                if (!line) {
+                    html.push('');
+                    inBlock = false;
+                    continue;
+                }
+                
+                // 이미 태그로 감싸진 줄 (헤딩, 리스트 등)
+                if (line.startsWith('<h') || 
+                    line.startsWith('<ul') || 
+                    line.startsWith('</ul') ||
+                    line.startsWith('<ol') || 
+                    line.startsWith('</ol') ||
+                    line.startsWith('<li')) {
+                    html.push(line);
+                    inBlock = (line.startsWith('<ul') || line.startsWith('<ol'));
+                } else if (!inBlock) {
+                    // 일반 텍스트는 p 태그로
+                    html.push('<p class="analysis-p">' + line + '</p>');
+                } else {
+                    html.push(line);
+                }
+            }
+            
+            return html.join('\n');
+        }
+
+        // 프롬프트 지시문 제거 함수
+        function removePromptInstructions(text) {
+            // 제거할 패턴들
+            const removePatterns = [
+                /당신은.{0,100}데이터 분석가.{0,200}입니다\./gi,
+                /하버드.{0,50}팔란티어.{0,100}/gi,
+                /## 작성 가이드라인[\s\S]*?(?=##[^#]|$)/gi,
+                /### \d+\..{0,50}가이드라인[\s\S]*?(?=###|##|$)/gi,
+                /반드시.{0,30}마크다운.{0,50}형식.{0,100}/gi,
+                /\*\*필수 포함 섹션\*\*[\s\S]*?(?=##|$)/gi,
+                /이모지를.{0,50}활용.{0,50}/gi,
+                /위 데이터를 바탕으로/gi,
+                /아래는.{0,50}분석 데이터입니다/gi
+            ];
+            
+            removePatterns.forEach(pattern => {
+                text = text.replace(pattern, '');
+            });
+            
+            // 연속된 빈 줄 정리
+            text = text.replace(/\n{3,}/g, '\n\n');
+            
+            return text.trim();
+        }
+
+        // 리스트 파싱 함수 (개선 버전 - 들여쓰기 강화)
+        function parseMarkdownLists(text) {
+            const lines = text.split('\n');
+            let result = [];
+            let listStack = []; // { type: 'ul'|'ol', level: number }
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const trimmed = line.trim();
+                
+                // 빈 줄 처리
+                if (!trimmed) {
+                    // 모든 열린 리스트 닫기
+                    while (listStack.length > 0) {
+                        const list = listStack.pop();
+                        result.push(list.type === 'ul' ? '</ul>' : '</ol>');
+                    }
+                    result.push('');
+                    continue;
+                }
+                
+                // 들여쓰기 수준 계산 (공백 2개 = 1레벨)
+                const leadingSpaces = line.match(/^(\s*)/)[1].length;
+                const level = Math.floor(leadingSpaces / 2);
+                
+                // 리스트 항목 체크
+                const unorderedMatch = trimmed.match(/^[\-\*]\s+(.+)$/);
+                const orderedMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+                
+                if (unorderedMatch || orderedMatch) {
+                    const content = unorderedMatch ? unorderedMatch[1] : orderedMatch[1];
+                    const type = unorderedMatch ? 'ul' : 'ol';
+                    
+                    // 스택 조정: 현재 레벨보다 깊은 리스트 닫기
+                    while (listStack.length > level) {
+                        const list = listStack.pop();
+                        result.push(list.type === 'ul' ? '</ul>' : '</ol>');
+                    }
+                    
+                    // 새로운 레벨 시작
+                    if (listStack.length < level + 1) {
+                        // 중간 레벨이 비어있으면 채우기
+                        while (listStack.length < level) {
+                            result.push('<ul class="analysis-ul">');
+                            listStack.push({ type: 'ul', level: listStack.length });
+                        }
+                        
+                        result.push(type === 'ul' ? '<ul class="analysis-ul">' : '<ol class="analysis-ol">');
+                        listStack.push({ type, level });
+                    }
+                    
+                    // 같은 레벨에서 타입 변경
+                    if (listStack.length > 0) {
+                        const currentList = listStack[listStack.length - 1];
+                        if (currentList.level === level && currentList.type !== type) {
+                            result.push(currentList.type === 'ul' ? '</ul>' : '</ol>');
+                            result.push(type === 'ul' ? '<ul class="analysis-ul">' : '<ol class="analysis-ol">');
+                            listStack[listStack.length - 1] = { type, level };
+                        }
+                    }
+                    
+                    // 리스트 아이템 추가
+                    result.push(`<li class="analysis-li">${content}</li>`);
+                } else {
+                    // 리스트가 아닌 줄 - 모든 리스트 닫기
+                    while (listStack.length > 0) {
+                        const list = listStack.pop();
+                        result.push(list.type === 'ul' ? '</ul>' : '</ol>');
+                    }
+                    result.push(line);
+                }
+            }
+            
+            // 마지막에 열린 리스트 닫기
+            while (listStack.length > 0) {
+                const list = listStack.pop();
+                result.push(list.type === 'ul' ? '</ul>' : '</ol>');
+            }
+            
+            return result.join('\n');
+        }
+
+        // 기존 분석 생성 함수들 (기존 코드 유지)
+        function generateFrequencyAnalysis() {
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            );
+
+            let html = `
+                <div class="analysis-section active">
+                    <div class="explanation-box">
+                        <div class="explanation-toggle">
+                            <h4>💡 기본 빈도 분석이란?</h4>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="explanation-content">
+                            <p><strong>뭐하는 거:</strong> 각 메타데이터에서 어떤 값이 가장 많이 사용되는지 세는 것입니다.</p>
+                            <p><strong>논리:</strong> 가장 많이 등장하는 값 = 검증된 성공 패턴</p>
+                            <p><strong>활용:</strong> 상위 10개가 공통적으로 사용하는 특성을 따라하면 성공 확률이 높아집니다.</p>
+                        </div>
+                    </div>
+
+                    <div class="conclusion-box">
+                        <h5>📝 Prime 콘텐츠 분석 결과</h5>
+                        <div id="frequencyConclusion">
+                            <p style="color: #666; text-align: center; padding: 20px;">
+                                👇 아래 버튼을 클릭하여 AI 분석을 시작하세요
+                            </p>
+                        </div>
+                        <button class="ai-enhance-btn" onclick="enhanceFrequencyWithAI()" id="frequencyAiBtn">
+                            ✨ AI 분석 시작하기
+                        </button>
+                        <div id="frequencyAiResult" style="display: none;"></div>
+                    </div>
+
+                    <div class="summary-box">
+                        <div class="insight-toggle">
+                            <h5 style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span>📊 핵심 분석 내용</span>
+                                <span class="toggle-icon" style="font-size: 1.2em;">▼</span>
+                            </h5>
+                        </div>
+                        <div class="insight-content">
+                            <ul id="frequencySummary"></ul>
+                        </div>
+                    </div>
+
+                    <div class="charts-toggle-section">
+                        <button class="charts-toggle-btn" onclick="toggleCharts('frequencyCharts')">
+                            <span>📊 차트 보기</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                        <div class="charts-content" id="frequencyCharts">
+                            <div class="chart-grid" id="frequencyChartsGrid"></div>
+                        </div>
+                    </div>
+
+                    <div class="download-section">
+                        <button class="btn btn-secondary" onclick="downloadFrequencyResults()">📥 텍스트 다운로드</button>
+                        <button class="btn" onclick="downloadFrequencyPDF()" style="margin-left: 10px;">📄 PDF 다운로드</button>
+                        <button class="btn" onclick="generateComprehensivePlaybook()" style="margin-left: 10px; background: linear-gradient(135deg, #9C27B0 0%, #AB47BC 100%);">📘 종합 플레이북 생성</button>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                const chartsGrid = document.getElementById('frequencyChartsGrid');
+                columns.forEach((col, idx) => {
+                    const freq = calculateFrequency(col);
+                    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5);
+                    
+                    const chartItem = document.createElement('div');
+                    chartItem.className = 'chart-grid-item';
+                    chartItem.innerHTML = `
+                        <h5>${col}</h5>
+                        <canvas id="freqChart${idx}"></canvas>
+                    `;
+                    chartsGrid.appendChild(chartItem);
+
+                    const ctx = document.getElementById(`freqChart${idx}`);
+                    charts[`freqChart${idx}`] = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: sorted.map(s => s[0]),
+                            datasets: [{
+                                data: sorted.map(s => s[1]),
+                                backgroundColor: [
+                                    'rgba(74, 144, 226, 0.8)',
+                                    'rgba(92, 167, 247, 0.8)',
+                                    'rgba(129, 212, 250, 0.8)',
+                                    'rgba(79, 195, 247, 0.8)',
+                                    'rgba(144, 202, 249, 0.8)'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        font: { size: 10 }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+
+                // 요약 생성
+                const summaryItems = [`<li>총 <strong>${columns.length}개</strong>의 메타데이터 분석</li>`];
+                
+                // 각 컬럼별 TOP 값 추가
+                columns.forEach(col => {
+                    const freq = calculateFrequency(col);
+                    const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+                    const topValue = sorted[0];
+                    const topPercent = ((topValue[1] / currentData.length) * 100).toFixed(1);
+                    summaryItems.push(`<li><strong>${col}</strong>: "${topValue[0]}" (${topValue[1]}개, ${topPercent}%)</li>`);
+                });
+                
+                summaryItems.push(`<li>각 메타데이터별 상위 5개 값의 빈도를 차트로 표시</li>`);
+                summaryItems.push(`<li>가장 많이 나타나는 값 = 검증된 성공 패턴</li>`);
+                
+                document.getElementById('frequencySummary').innerHTML = summaryItems.join('');
+                
+                // 캐시된 AI 결과 복원
+                if (aiAnalysisCache.frequency) {
+                    document.getElementById('frequencyAiResult').style.display = 'block';
+                    document.getElementById('frequencyAiResult').innerHTML = aiAnalysisCache.frequency;
+                    document.getElementById('frequencyAiBtn').innerHTML = '✨ 다시 분석하기';
+                    document.getElementById('frequencyConclusion').innerHTML = generateFrequencyConclusion();
+                }
+                
+                // 인사이트 토글 이벤트
+                const toggleBtn = document.querySelector('#frequencySummary')?.parentElement?.previousElementSibling;
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function() {
+                        const content = this.nextElementSibling;
+                        const icon = this.querySelector('.toggle-icon');
+                        content.classList.toggle('open');
+                        icon.classList.toggle('open');
+                    });
+                }
+            }, 100);
+
+            return html;
+        }
+
+        function generateFrequencyConclusion() {
+            return `<div class="conclusion-summary"><p>AI 분석이 완료되었습니다. 위 내용을 참고하여 콘텐츠를 제작하세요.</p></div>`;
+        }
+
+        function generateCombinationAnalysis() {
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            );
+            const combinations = findTopCombinations(columns, 2);
+
+            let html = `
+                <div class="analysis-section active">
+                    <div class="explanation-box">
+                        <div class="explanation-toggle">
+                            <h4>💡 조합 패턴 분석이란?</h4>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="explanation-content">
+                            <p><strong>뭐하는 거:</strong> 두 개 이상의 메타데이터가 함께 나타나는 패턴을 찾습니다.</p>
+                            <p><strong>논리:</strong> 성공한 콘텐츠들이 공통적으로 사용하는 "황금 조합"을 발견</p>
+                            <p><strong>활용:</strong> 검증된 조합을 그대로 사용하면 실패 리스크를 줄일 수 있습니다.</p>
+                        </div>
+                    </div>
+
+                    <div class="conclusion-box">
+                        <h5>📝 Prime 콘텐츠 분석 결과</h5>
+                        <div id="combinationConclusion">
+                            <p style="color: #666; text-align: center; padding: 20px;">
+                                👇 아래 버튼을 클릭하여 AI 분석을 시작하세요
+                            </p>
+                        </div>
+                        <button class="ai-enhance-btn" onclick="enhanceCombinationWithAI()" id="combinationAiBtn">
+                            ✨ AI 분석 시작하기
+                        </button>
+                        <div id="combinationAiResult" style="display: none;"></div>
+                    </div>
+
+                    <div class="summary-box">
+                        <div class="insight-toggle">
+                            <h5 style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span>📊 핵심 분석 내용</span>
+                                <span class="toggle-icon" style="font-size: 1.2em;">▼</span>
+                            </h5>
+                        </div>
+                        <div class="insight-content">
+                            <ul id="combinationSummary"></ul>
+                        </div>
+                    </div>
+
+                    <div class="result-box">
+                        <h4>🔗 주요 조합 패턴 (TOP 15)</h4>
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>순위</th>
+                                        <th>조합 패턴</th>
+                                        <th>출현 횟수</th>
+                                        <th>비율</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="combinationTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="charts-toggle-section">
+                        <button class="charts-toggle-btn" onclick="toggleCharts('combinationCharts')">
+                            <span>📊 차트 보기</span>
+                            <span class="toggle-icon">▼</span>
+                        </button>
+                        <div class="charts-content" id="combinationCharts">
+                            <div class="chart-container">
+                                <canvas id="combinationChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="download-section">
+                        <button class="btn btn-secondary" onclick="downloadCombinationResults()">📥 텍스트 다운로드</button>
+                        <button class="btn" onclick="downloadCombinationPDF()" style="margin-left: 10px;">📄 PDF 다운로드</button>
+                        <button class="btn" onclick="generateComprehensivePlaybook()" style="margin-left: 10px; background: linear-gradient(135deg, #9C27B0 0%, #AB47BC 100%);">📘 종합 플레이북 생성</button>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                // 테이블 생성
+                const tableBody = document.getElementById('combinationTable');
+                combinations.slice(0, 15).forEach((combo, idx) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${idx + 1}</td>
+                        <td style="text-align: left; padding-left: 15px;">${combo.pattern}</td>
+                        <td><strong>${combo.count}</strong></td>
+                        <td>${((combo.count/currentData.length)*100).toFixed(1)}%</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                // 차트 생성
+                const ctx = document.getElementById('combinationChart');
+                const topCombos = combinations.slice(0, 10);
+                charts['combinationChart'] = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: topCombos.map((c, i) => `조합 ${i+1}`),
+                        datasets: [{
+                            label: '출현 횟수',
+                            data: topCombos.map(c => c.count),
+                            backgroundColor: 'rgba(74, 144, 226, 0.8)',
+                            borderColor: 'rgba(74, 144, 226, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+
+                // 요약
+                const summary = [
+                    `<li>총 <strong>${combinations.length}개</strong>의 조합 패턴 발견</li>`,
+                    `<li>가장 많은 조합: <strong>${combinations[0].pattern}</strong> (${combinations[0].count}회)</li>`,
+                    `<li>TOP 3 조합이 전체의 ${((combinations.slice(0,3).reduce((sum, c) => sum + c.count, 0) / currentData.length * 100)).toFixed(1)}% 차지</li>`
+                ];
+                document.getElementById('combinationSummary').innerHTML = summary.join('');
+                
+                // 캐시된 AI 결과 복원
+                if (aiAnalysisCache.combination) {
+                    document.getElementById('combinationAiResult').style.display = 'block';
+                    document.getElementById('combinationAiResult').innerHTML = aiAnalysisCache.combination;
+                    document.getElementById('combinationAiBtn').innerHTML = '✨ 다시 분석하기';
+                    document.getElementById('combinationConclusion').innerHTML = generateCombinationConclusion(combinations);
+                }
+                
+                // 인사이트 토글 이벤트
+                const toggleBtn = document.querySelector('#combinationSummary')?.parentElement?.previousElementSibling;
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function() {
+                        const content = this.nextElementSibling;
+                        const icon = this.querySelector('.toggle-icon');
+                        content.classList.toggle('open');
+                        icon.classList.toggle('open');
+                    });
+                }
+            }, 100);
+
+            return html;
+        }
+
+        function generateCombinationConclusion(combinations) {
+            return `<div class="conclusion-summary"><p>AI 분석이 완료되었습니다. 위 내용을 참고하여 콘텐츠를 제작하세요.</p></div>`;
+        }
+
+        function findTopCombinations(columns, size) {
+            const combinations = {};
+            
+            currentData.forEach(row => {
+                for (let i = 0; i < columns.length; i++) {
+                    for (let j = i + 1; j < columns.length; j++) {
+                        const key = `${columns[i]}="${row[columns[i]]}" + ${columns[j]}="${row[columns[j]]}"`;
+                        combinations[key] = (combinations[key] || 0) + 1;
+                    }
+                }
+            });
+
+            return Object.entries(combinations)
+                .map(([pattern, count]) => ({ pattern, count }))
+                .sort((a, b) => b.count - a.count);
+        }
+
+        function generateAssociationAnalysis() {
+            const rules = calculateAssociationRules();
+
+            let html = `
+                <div class="analysis-section active">
+                    <div class="explanation-box">
+                        <div class="explanation-toggle">
+                            <h4>💡 연관 규칙 분석이란?</h4>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="explanation-content">
+                            <p><strong>뭐하는 거:</strong> "A를 선택하면 → B도 함께 선택한다"는 규칙을 찾습니다.</p>
+                            <p><strong>논리:</strong> 신뢰도가 높은 규칙 = 강한 인과 관계</p>
+                            <p><strong>활용:</strong> A를 정했다면 B는 자동으로 따라가야 합니다. 검증된 세트 메뉴처럼 사용하세요.</p>
+                        </div>
+                    </div>
+
+                    <div class="conclusion-box">
+                        <h5>📝 Prime 콘텐츠 분석 결과</h5>
+                        <div id="associationConclusion">
+                            <p style="color: #666; text-align: center; padding: 20px;">
+                                👇 아래 버튼을 클릭하여 AI 분석을 시작하세요
+                            </p>
+                        </div>
+                        <button class="ai-enhance-btn" onclick="enhanceAssociationWithAI()" id="associationAiBtn">
+                            ✨ AI 분석 시작하기
+                        </button>
+                        <div id="associationAiResult" style="display: none;"></div>
+                    </div>
+
+                    <div class="summary-box">
+                        <div class="insight-toggle">
+                            <h5 style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span>📊 핵심 분석 내용</span>
+                                <span class="toggle-icon" style="font-size: 1.2em;">▼</span>
+                            </h5>
+                        </div>
+                        <div class="insight-content">
+                            <ul id="associationSummary"></ul>
+                        </div>
+                    </div>
+
+                    <div class="result-box">
+                        <h4>🎯 강력한 연관 규칙 (TOP 10)</h4>
+                        <div id="rulesTable"></div>
+                    </div>
+
+                    <div class="download-section">
+                        <button class="btn btn-secondary" onclick="downloadAssociationResults()">📥 텍스트 다운로드</button>
+                        <button class="btn" onclick="downloadAssociationPDF()" style="margin-left: 10px;">📄 PDF 다운로드</button>
+                        <button class="btn" onclick="generateComprehensivePlaybook()" style="margin-left: 10px; background: linear-gradient(135deg, #9C27B0 0%, #AB47BC 100%);">📘 종합 플레이북 생성</button>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                if (rules.length > 0) {
+                    // 테이블 생성
+                    let tableHTML = `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>순위</th>
+                                        <th>규칙 (A → B)</th>
+                                        <th>신뢰도</th>
+                                        <th>지지도</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    rules.slice(0, 10).forEach((rule, idx) => {
+                        tableHTML += `
+                            <tr>
+                                <td>${idx + 1}</td>
+                                <td style="text-align: left; padding-left: 15px;">${rule.rule}</td>
+                                <td><strong>${(rule.confidence * 100).toFixed(1)}%</strong></td>
+                                <td>${(rule.support * 100).toFixed(1)}%</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    tableHTML += '</tbody></table></div>';
+                    document.getElementById('rulesTable').innerHTML = tableHTML;
+
+                    // 요약
+                    const summary = [
+                        `<li>총 <strong>${rules.length}개</strong>의 연관 규칙 발견</li>`,
+                        `<li>가장 강한 규칙: <strong>${rules[0].rule}</strong> (신뢰도 ${(rules[0].confidence * 100).toFixed(1)}%)</li>`,
+                        `<li>평균 신뢰도: ${(rules.reduce((sum, r) => sum + r.confidence, 0) / rules.length * 100).toFixed(1)}%</li>`
+                    ];
+                    document.getElementById('associationSummary').innerHTML = summary.join('');
+                } else {
+                    document.getElementById('rulesTable').innerHTML = '<p>유의미한 연관 규칙을 찾지 못했습니다.</p>';
+                }
+                
+                // 캐시된 AI 결과 복원
+                if (aiAnalysisCache.association) {
+                    document.getElementById('associationAiResult').style.display = 'block';
+                    document.getElementById('associationAiResult').innerHTML = aiAnalysisCache.association;
+                    document.getElementById('associationAiBtn').innerHTML = '✨ 다시 분석하기';
+                    document.getElementById('associationConclusion').innerHTML = generateAssociationConclusion(rules);
+                }
+                
+                // 인사이트 토글 이벤트
+                const toggleBtn = document.querySelector('#associationSummary')?.parentElement?.previousElementSibling;
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function() {
+                        const content = this.nextElementSibling;
+                        const icon = this.querySelector('.toggle-icon');
+                        content.classList.toggle('open');
+                        icon.classList.toggle('open');
+                    });
+                }
+            }, 100);
+
+            return html;
+        }
+
+        function generateAssociationConclusion(rules) {
+            return `<div class="conclusion-summary"><p>AI 분석이 완료되었습니다. 위 내용을 참고하여 콘텐츠를 제작하세요.</p></div>`;
+        }
+
+        function calculateAssociationRules() {
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            ).slice(0, 5);
+
+            const rules = [];
+            const minSupport = 0.2;
+            const minConfidence = 0.5;
+
+            for (let i = 0; i < columns.length; i++) {
+                for (let j = 0; j < columns.length; j++) {
+                    if (i === j) continue;
+
+                    const colA = columns[i];
+                    const colB = columns[j];
+
+                    const valuesA = [...new Set(currentData.map(row => row[colA]))];
+                    const valuesB = [...new Set(currentData.map(row => row[colB]))];
+
+                    valuesA.forEach(valA => {
+                        valuesB.forEach(valB => {
+                            const countA = currentData.filter(row => row[colA] === valA).length;
+                            const countAB = currentData.filter(row => 
+                                row[colA] === valA && row[colB] === valB
+                            ).length;
+
+                            const support = countAB / currentData.length;
+                            const confidence = countAB / countA;
+
+                            if (support >= minSupport && confidence >= minConfidence) {
+                                rules.push({
+                                    rule: `${colA}="${valA}" → ${colB}="${valB}"`,
+                                    support: support,
+                                    confidence: confidence,
+                                    lift: confidence / (currentData.filter(row => row[colB] === valB).length / currentData.length)
+                                });
+                            }
+                        });
+                    });
+                }
+            }
+
+            return rules.sort((a, b) => b.confidence - a.confidence);
+        }
+
+        function generateVisualMapping() {
+            let html = `
+                <div class="analysis-section active">
+                    <div class="explanation-box">
+                        <div class="explanation-toggle">
+                            <h4>💡 비주얼 맵핑이란?</h4>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="explanation-content">
+                            <p><strong>뭐하는 거:</strong> 메타데이터 간의 관계를 시각적으로 표현합니다.</p>
+                            <p><strong>논리:</strong> 복잡한 패턴을 한눈에 파악할 수 있도록 네트워크 형태로 시각화합니다.</p>
+                            <p><strong>활용:</strong> 어떤 특성들이 밀접하게 연결되어 있는지 직관적으로 이해</p>
+                        </div>
+                    </div>
+
+                    <div class="conclusion-box">
+                        <h5>📝 Prime 콘텐츠 분석 결과</h5>
+                        <div id="visualConclusion">
+                            <p style="color: #666; text-align: center; padding: 20px;">
+                                👇 아래 버튼을 클릭하여 AI 분석을 시작하세요
+                            </p>
+                        </div>
+                        <button class="ai-enhance-btn" onclick="enhanceVisualWithAI()" id="visualAiBtn">
+                            ✨ AI 분석 시작하기
+                        </button>
+                        <div id="visualAiResult" style="display: none;"></div>
+                    </div>
+
+                    <div class="summary-box">
+                        <div class="insight-toggle">
+                            <h5 style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span>📊 핵심 분석 내용</span>
+                                <span class="toggle-icon" style="font-size: 1.2em;">▼</span>
+                            </h5>
+                        </div>
+                        <div class="insight-content">
+                            <ul id="visualSummary"></ul>
+                        </div>
+                    </div>
+
+                    <div class="result-box">
+                        <h4>🗺️ 메타데이터 히트맵</h4>
+                        <div class="chart-container" style="height: 600px;">
+                            <canvas id="heatmapChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="result-box">
+                        <h4>📊 특성별 다양성 비교</h4>
+                        <p style="color: #666; margin-bottom: 15px; font-size: 0.95em;">
+                            * 각 메타데이터가 얼마나 다양한 값을 가지는지 보여줍니다. 값이 클수록 선택지가 다양함을 의미합니다.
+                        </p>
+                        <div class="chart-container">
+                            <canvas id="radarChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="download-section">
+                        <button class="btn btn-secondary" onclick="downloadVisualResults()">📥 차트 저장 안내</button>
+                        <button class="btn" onclick="downloadVisualPDF()" style="margin-left: 10px;">📄 PDF 다운로드</button>
+                        <button class="btn" onclick="generateComprehensivePlaybook()" style="margin-left: 10px; background: linear-gradient(135deg, #9C27B0 0%, #AB47BC 100%);">📘 종합 플레이북 생성</button>
+                    </div>
+                </div>
+            `;
+
+            setTimeout(() => {
+                const diversityData = createHeatmap();
+                createRadarChart();
+
+                const columns = Object.keys(currentData[0]).filter(col => 
+                    !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+                );
+
+                const summary = [
+                    `<li>총 <strong>${columns.length}개</strong>의 메타데이터 분석</li>`,
+                    `<li>히트맵: 진한 색상 = 높은 빈도 (가장 많이 사용된 값)</li>`,
+                    `<li>레이더 차트: 각 메타데이터의 다양성 측정 (고유값 개수)</li>`,
+                    `<li>다양성이 높은 메타데이터 = 차별화 포인트로 활용 가능</li>`
+                ];
+                document.getElementById('visualSummary').innerHTML = summary.join('');
+                
+                // 캐시된 AI 결과 복원
+                if (aiAnalysisCache.visual) {
+                    document.getElementById('visualAiResult').style.display = 'block';
+                    document.getElementById('visualAiResult').innerHTML = aiAnalysisCache.visual;
+                    document.getElementById('visualAiBtn').innerHTML = '✨ 다시 분석하기';
+                    document.getElementById('visualConclusion').innerHTML = generateVisualConclusion([]);
+                }
+                
+                // 인사이트 토글 이벤트
+                const toggleBtn = document.querySelector('#visualSummary')?.parentElement?.previousElementSibling;
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', function() {
+                        const content = this.nextElementSibling;
+                        const icon = this.querySelector('.toggle-icon');
+                        content.classList.toggle('open');
+                        icon.classList.toggle('open');
+                    });
+                }
+            }, 100);
+
+            return html;
+        }
+
+        function generateVisualConclusion(diversityData) {
+            return `<div class="conclusion-summary"><p>AI 분석이 완료되었습니다. 위 내용을 참고하여 콘텐츠를 제작하세요.</p></div>`;
+        }
+
+        function createHeatmap() {
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            ).slice(0, 8);
+
+            const matrix = [];
+            const labels = [];
+            const diversityData = [];
+
+            columns.forEach(col => {
+                const freq = calculateFrequency(col);
+                const topValues = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5);
+                const uniqueCount = Object.keys(freq).length;
+                
+                diversityData.push({ column: col, diversity: uniqueCount });
+                
+                topValues.forEach(([value, count]) => {
+                    labels.push(`${col}: ${value}`);
+                    matrix.push(count);
+                });
+            });
+
+            const ctx = document.getElementById('heatmapChart');
+            if (!ctx) return diversityData;
+
+            charts['heatmapChart'] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '빈도',
+                        data: matrix,
+                        backgroundColor: matrix.map(val => {
+                            const intensity = val / Math.max(...matrix);
+                            return `rgba(74, 144, 226, ${0.3 + intensity * 0.7})`;
+                        }),
+                        borderColor: 'rgba(74, 144, 226, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            return diversityData;
+        }
+
+        function createRadarChart() {
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            ).slice(0, 6);
+
+            const data = columns.map(col => {
+                const freq = calculateFrequency(col);
+                return Object.keys(freq).length;
+            });
+
+            const ctx = document.getElementById('radarChart');
+            if (!ctx) return;
+
+            charts['radarChart'] = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: columns,
+                    datasets: [{
+                        label: '고유값 개수 (다양성)',
+                        data: data,
+                        backgroundColor: 'rgba(74, 144, 226, 0.2)',
+                        borderColor: 'rgba(74, 144, 226, 1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(74, 144, 226, 1)',
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 차트 토글 함수
+        function toggleCharts(chartId) {
+            const content = document.getElementById(chartId);
+            const btn = event.target.closest('.charts-toggle-btn');
+            const icon = btn.querySelector('.toggle-icon');
+            
+            content.classList.toggle('open');
+            icon.classList.toggle('open');
+        }
+
+        // 다운로드 함수들
+        function downloadFrequencyResults() {
+            let text = '=== 기본 빈도 분석 결과 ===\n\n';
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            );
+
+            columns.forEach(col => {
+                const freq = calculateFrequency(col);
+                text += `\n[${col}]\n`;
+                Object.entries(freq).sort((a, b) => b[1] - a[1]).forEach(([key, val]) => {
+                    text += `  ${key}: ${val}개 (${((val/currentData.length)*100).toFixed(1)}%)\n`;
+                });
+            });
+
+            downloadTextFile('빈도분석_결과.txt', text);
+        }
+
+        function downloadCombinationResults() {
+            const columns = Object.keys(currentData[0]).filter(col => 
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+            );
+            const combinations = findTopCombinations(columns, 2);
+
+            let text = '=== 조합 패턴 분석 결과 ===\n\n';
+            combinations.forEach((combo, idx) => {
+                text += `${idx + 1}. ${combo.pattern}: ${combo.count}회\n`;
+            });
+
+            downloadTextFile('조합분석_결과.txt', text);
+        }
+
+        function downloadAssociationResults() {
+            const rules = calculateAssociationRules();
+
+            let text = '=== 연관 규칙 분석 결과 ===\n\n';
+            rules.forEach((rule, idx) => {
+                text += `${idx + 1}. ${rule.rule}\n`;
+                text += `   신뢰도: ${(rule.confidence * 100).toFixed(1)}%, 지지도: ${(rule.support * 100).toFixed(1)}%\n\n`;
+            });
+
+            downloadTextFile('연관규칙_결과.txt', text);
+        }
+
+        function downloadVisualResults() {
+            alert('시각화 이미지를 다운로드하려면 차트를 우클릭하여 "이미지로 저장"을 선택하세요.');
+        }
+
+        function downloadTextFile(filename, text) {
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // PDF 다운로드 함수들 - 모두 통합 PDF 생성
+        async function downloadFrequencyPDF() {
+            await downloadAllAnalysisAsPDF();
+        }
+
+        async function downloadCombinationPDF() {
+            await downloadAllAnalysisAsPDF();
+        }
+
+        async function downloadAssociationPDF() {
+            await downloadAllAnalysisAsPDF();
+        }
+
+        async function downloadVisualPDF() {
+            await downloadAllAnalysisAsPDF();
+        }
+
+        // 통합 PDF 다운로드 함수 (html2canvas 사용)
+        async function downloadAllAnalysisAsPDF() {
+            try {
+                // 로딩 알림
+                const originalBtn = event.target;
+                const originalText = originalBtn.textContent;
+                originalBtn.disabled = true;
+                originalBtn.textContent = '📄 PDF 생성 중... (모든 분석 탭 통합)';
+
+                // jsPDF 인스턴스 생성
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                const today = new Date().toLocaleDateString('ko-KR');
+                const fileName = uploadedFiles[currentFileIndex]?.name || '데이터';
+                
+                // 표지 페이지 HTML로 생성
+                const coverDiv = document.createElement('div');
+                coverDiv.style.cssText = `
+                    width: 794px;
+                    height: 1123px;
+                    background: white;
+                    padding: 60px;
+                    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+                    position: fixed;
+                    left: -9999px;
+                    top: 0;
+                `;
+                coverDiv.innerHTML = `
+                    <div style="text-align: center; margin-top: 100px;">
+                        <h1 style="font-size: 42px; color: #1565C0; margin-bottom: 40px; font-weight: 700;">
+                            📊 메타데이터 패턴 분석 보고서
+                        </h1>
+                        <div style="font-size: 22px; color: #666; margin-bottom: 20px;">
+                            <strong>분석 파일:</strong> ${fileName}
+                        </div>
+                        <div style="font-size: 20px; color: #666; margin-bottom: 60px;">
+                            <strong>생성 날짜:</strong> ${today}
+                        </div>
+                        <div style="width: 80%; height: 2px; background: #4A90E2; margin: 60px auto;"></div>
+                        <div style="text-align: left; max-width: 500px; margin: 60px auto;">
+                            <h2 style="font-size: 26px; color: #1565C0; margin-bottom: 30px;">📋 포함된 분석</h2>
+                            <div style="font-size: 20px; color: #444; line-height: 2.2;">
+                                <div style="padding: 12px 0; border-bottom: 1px solid #E3F2FD;">
+                                    <strong>1.</strong> 기본 빈도 분석
+                                </div>
+                                <div style="padding: 12px 0; border-bottom: 1px solid #E3F2FD;">
+                                    <strong>2.</strong> 조합 패턴 분석
+                                </div>
+                                <div style="padding: 12px 0; border-bottom: 1px solid #E3F2FD;">
+                                    <strong>3.</strong> 연관 규칙 분석
+                                </div>
+                                <div style="padding: 12px 0; border-bottom: 1px solid #E3F2FD;">
+                                    <strong>4.</strong> 비주얼 맵핑 분석
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(coverDiv);
+                
+                // 표지 캡처
+                const coverCanvas = await html2canvas(coverDiv, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+                
+                const coverImgData = coverCanvas.toDataURL('image/png');
+                doc.addImage(coverImgData, 'PNG', 0, 0, 210, 297); // A4 전체 크기
+                
+                // 표지 div 제거
+                document.body.removeChild(coverDiv);
+
+                // 4개 분석 탭 정보
+                const analysisTypes = [
+                    { tab: 'frequency', title: '기본 빈도 분석', tabBtn: document.querySelector('[data-tab="frequency"]') },
+                    { tab: 'combination', title: '조합 패턴 분석', tabBtn: document.querySelector('[data-tab="combination"]') },
+                    { tab: 'association', title: '연관 규칙 분석', tabBtn: document.querySelector('[data-tab="association"]') },
+                    { tab: 'visual', title: '비주얼 맵핑 분석', tabBtn: document.querySelector('[data-tab="visual"]') }
+                ];
+
+                // 각 탭 순회하며 캡처
+                for (let i = 0; i < analysisTypes.length; i++) {
+                    const analysis = analysisTypes[i];
+                    
+                    // 탭 활성화
+                    analysis.tabBtn.click();
+                    
+                    // DOM 업데이트 대기
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // 새 페이지 추가 (표지 다음부터)
+                    doc.addPage();
+                    
+                    // 섹션 제목 HTML로 생성
+                    const titleDiv = document.createElement('div');
+                    titleDiv.style.cssText = `
+                        width: 794px;
+                        height: 100px;
+                        background: white;
+                        padding: 30px;
+                        font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+                        position: fixed;
+                        left: -9999px;
+                        top: 0;
+                    `;
+                    titleDiv.innerHTML = `
+                        <h2 style="font-size: 28px; color: #1565C0; margin: 0; padding-bottom: 15px; border-bottom: 3px solid #4A90E2;">
+                            ${i + 1}. ${analysis.title}
+                        </h2>
+                    `;
+                    document.body.appendChild(titleDiv);
+                    
+                    // 제목 캡처
+                    const titleCanvas = await html2canvas(titleDiv, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff'
+                    });
+                    
+                    const titleImgData = titleCanvas.toDataURL('image/png');
+                    doc.addImage(titleImgData, 'PNG', 0, 0, 210, 35);
+                    
+                    // 제목 div 제거
+                    document.body.removeChild(titleDiv);
+
+                    // AI 분석 결과 캡처
+                    const aiResult = document.querySelector(`#${analysis.tab}AiResult .prime-analysis-result`);
+                    
+                    if (aiResult && aiResult.offsetHeight > 0) {
+                        // html2canvas로 캡처
+                        const canvas = await html2canvas(aiResult, {
+                            scale: 2,
+                            useCORS: true,
+                            logging: false,
+                            backgroundColor: '#ffffff'
+                        });
+                        
+                        const imgData = canvas.toDataURL('image/png');
+                        const imgWidth = 170; // A4 너비에 맞춤
+                        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                        
+                        let yPosition = 40; // 제목 아래 시작
+                        let remainingHeight = imgHeight;
+                        let sourceY = 0;
+                        
+                        // 이미지가 페이지보다 길면 여러 페이지로 분할
+                        while (remainingHeight > 0) {
+                            const availableHeight = 267 - yPosition; // A4 높이 - 여백
+                            const heightToAdd = Math.min(remainingHeight, availableHeight);
+                            
+                            // 캔버스의 일부분만 잘라서 추가
+                            const tempCanvas = document.createElement('canvas');
+                            tempCanvas.width = canvas.width;
+                            tempCanvas.height = (heightToAdd / imgWidth) * canvas.width;
+                            
+                            const ctx = tempCanvas.getContext('2d');
+                            ctx.drawImage(
+                                canvas,
+                                0, (sourceY / imgHeight) * canvas.height,
+                                canvas.width, (heightToAdd / imgWidth) * canvas.width,
+                                0, 0,
+                                canvas.width, (heightToAdd / imgWidth) * canvas.width
+                            );
+                            
+                            const partialImgData = tempCanvas.toDataURL('image/png');
+                            doc.addImage(partialImgData, 'PNG', 20, yPosition, imgWidth, heightToAdd);
+                            
+                            remainingHeight -= heightToAdd;
+                            sourceY += heightToAdd;
+                            
+                            if (remainingHeight > 0) {
+                                doc.addPage();
+                                yPosition = 20;
+                            }
+                        }
+                    } else {
+                        // AI 분석이 없는 경우 - HTML로 메시지 생성
+                        const noAnalysisDiv = document.createElement('div');
+                        noAnalysisDiv.style.cssText = `
+                            width: 794px;
+                            height: 200px;
+                            background: white;
+                            padding: 40px;
+                            font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+                            position: fixed;
+                            left: -9999px;
+                            top: 0;
+                        `;
+                        noAnalysisDiv.innerHTML = `
+                            <div style="text-align: center; padding: 40px; background: #F5F5F5; border-radius: 10px; border: 2px dashed #BBDEFB;">
+                                <div style="font-size: 48px; margin-bottom: 20px;">📝</div>
+                                <div style="font-size: 20px; color: #666; margin-bottom: 15px;">
+                                    AI 분석이 수행되지 않았습니다.
+                                </div>
+                                <div style="font-size: 16px; color: #999;">
+                                    각 탭에서 "✨ AI 분석 시작하기" 버튼을 클릭하여 분석을 수행하세요.
+                                </div>
+                            </div>
+                        `;
+                        document.body.appendChild(noAnalysisDiv);
+                        
+                        const noAnalysisCanvas = await html2canvas(noAnalysisDiv, {
+                            scale: 2,
+                            useCORS: true,
+                            logging: false,
+                            backgroundColor: '#ffffff'
+                        });
+                        
+                        const noAnalysisImgData = noAnalysisCanvas.toDataURL('image/png');
+                        doc.addImage(noAnalysisImgData, 'PNG', 20, 40, 170, 70);
+                        
+                        document.body.removeChild(noAnalysisDiv);
+                    }
+
+                    // 차트 캡처 (있는 경우)
+                    const chartsContent = document.querySelector(`#${analysis.tab}Charts`);
+                    if (chartsContent && chartsContent.classList.contains('open')) {
+                        const chartCanvas = chartsContent.querySelector('canvas');
+                        if (chartCanvas) {
+                            doc.addPage();
+                            
+                            // 차트 제목 HTML로 생성
+                            const chartTitleDiv = document.createElement('div');
+                            chartTitleDiv.style.cssText = `
+                                width: 794px;
+                                height: 80px;
+                                background: white;
+                                padding: 20px;
+                                font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+                                position: fixed;
+                                left: -9999px;
+                                top: 0;
+                            `;
+                            chartTitleDiv.innerHTML = `
+                                <h3 style="font-size: 22px; color: #1565C0; margin: 0;">
+                                    📊 차트 시각화
+                                </h3>
+                            `;
+                            document.body.appendChild(chartTitleDiv);
+                            
+                            const chartTitleCanvas = await html2canvas(chartTitleDiv, {
+                                scale: 2,
+                                useCORS: true,
+                                logging: false,
+                                backgroundColor: '#ffffff'
+                            });
+                            
+                            const chartTitleImgData = chartTitleCanvas.toDataURL('image/png');
+                            doc.addImage(chartTitleImgData, 'PNG', 0, 0, 210, 28);
+                            
+                            document.body.removeChild(chartTitleDiv);
+                            
+                            const chartImgData = chartCanvas.toDataURL('image/png');
+                            doc.addImage(chartImgData, 'PNG', 20, 30, 170, 120);
+                        }
+                    }
+                }
+
+                // PDF 저장
+                const timestamp = new Date().toISOString().slice(0, 10);
+                doc.save(`메타데이터_분석_통합_${timestamp}.pdf`);
+                
+                // 버튼 복원
+                originalBtn.disabled = false;
+                originalBtn.textContent = originalText;
+                
+                alert('✅ 통합 PDF 다운로드가 완료되었습니다!\n\n모든 분석 탭의 내용이 포함되어 있습니다.');
+            } catch (error) {
+                console.error('PDF 생성 오류:', error);
+                alert('PDF 생성 중 오류가 발생했습니다: ' + error.message);
+                
+                // 버튼 복원
+                if (event && event.target) {
+                    event.target.disabled = false;
+                    event.target.textContent = '📄 PDF 다운로드';
+                }
+            }
+        }
+
+        // 종합 플레이북 생성 함수
+        async function generateComprehensivePlaybook() {
+            try {
+                // Gemini API 확인
+                if (!geminiApiKey) {
+                    alert('⚠️ Gemini API 키를 먼저 연결해주세요.\n\nAPI 설정 섹션에서 API 키를 입력하세요.');
+                    return;
+                }
+
+                // 4개 탭 AI 분석 결과 확인
+                const hasFrequency = aiAnalysisCache.frequency;
+                const hasCombination = aiAnalysisCache.combination;
+                const hasAssociation = aiAnalysisCache.association;
+                const hasVisual = aiAnalysisCache.visual;
+
+                if (!hasFrequency || !hasCombination || !hasAssociation || !hasVisual) {
+                    alert('⚠️ 모든 분석 탭에서 AI 분석을 먼저 수행해주세요.\n\n누락된 분석:\n' +
+                        (!hasFrequency ? '- 빈도 분석\n' : '') +
+                        (!hasCombination ? '- 조합 패턴 분석\n' : '') +
+                        (!hasAssociation ? '- 연관 규칙 분석\n' : '') +
+                        (!hasVisual ? '- 비주얼 맵핑 분석\n' : ''));
+                    return;
+                }
+
+                // 로딩 시작
+                const originalBtn = event.target;
+                const originalText = originalBtn.textContent;
+                originalBtn.disabled = true;
+                originalBtn.textContent = '📘 플레이북 생성 중... (30초~1분 소요)';
+
+                // 각 분석 결과에서 텍스트 추출
+                const extractTextFromHTML = (htmlString) => {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = htmlString;
+                    return tempDiv.textContent || tempDiv.innerText || '';
+                };
+
+                const frequencyText = extractTextFromHTML(hasFrequency);
+                const combinationText = extractTextFromHTML(hasCombination);
+                const associationText = extractTextFromHTML(hasAssociation);
+                const visualText = extractTextFromHTML(hasVisual);
+
+                // Gemini에게 통합 요약 요청
+                const prompt = `# 초압축 플레이북 생성 미션 🎯
+
+우리가 4가지 분석을 다 돌렸어요. 이제 이걸 **실전에서 바로 쓸 수 있는 초간결 플레이북**으로 만들어주세요!
+
+## 📊 4가지 분석 결과
+${frequencyText.slice(0, 2500)}
+${combinationText.slice(0, 2500)}
+${associationText.slice(0, 2500)}
+${visualText.slice(0, 2500)}
+
+---
+
+## 🎨 작성 스타일 (이게 제일 중요!)
+
+**말투:**
+- 완전 친구한테 말하듯이 편하게! 
+- "~해야 합니다" ❌ → "~하면 돼요" ✅
+- "분석 결과에 따르면" ❌ → "데이터 보니까" ✅
+- 이모지 많이 써주세요 🔥💡✨
+
+**분량:**
+- PDF로 만들면 **커버 포함 4페이지 이내!** (진짜 중요!)
+- 각 섹션마다 **핵심만 딱딱** 정리
+- 불필요한 설명은 전부 삭제
+- 짧고 강렬하게!
+
+**마크다운:**
+- ## (H2), ### (H3), #### (H4) 사용
+- 하위 항목은 공백 2개 들여쓰기
+- 예시:
+
+### 섹션
+- 항목
+  - 상세 (공백 2개!)
+
+## 📋 필수 섹션 (이것만!)
+
+### 🎯 한줄 요약
+데이터 전체를 **딱 한줄**로! (20자 이내)
+
+### 🔥 지금 바로 할 것 TOP 3
+
+#### 1. [액션 제목 - 5자 이내]
+- 왜? (한줄!)
+  - 근거 데이터 (한줄!)
+- 어떻게? (한줄!)
+  - 구체적 방법 (한줄!)
+
+#### 2. [액션 제목]
+(동일 구조)
+
+#### 3. [액션 제목]
+(동일 구조)
+
+### ⚠️ 절대 금지 3가지
+- 실패 패턴 1: [제목]
+  - 왜 피해야 할까? (한줄!)
+  - 대신 이렇게 (한줄!)
+- 실패 패턴 2: [제목]
+  - 왜 피해야 할까?
+  - 대신 이렇게
+- 실패 패턴 3: [제목]
+  - 왜 피해야 할까?
+  - 대신 이렇게
+
+### 💎 성공 공식
+데이터로 검증된 황금 조합을 **3줄 이내**로 딱 정리
+
+### 🚀 30분 액션플랜
+오늘 당장 30분만 투자해서 할 수 있는 것 **3개**만
+- [ ] 액션 1 (구체적으로!)
+- [ ] 액션 2 (구체적으로!)
+- [ ] 액션 3 (구체적으로!)
+
+---
+
+## 🚨 절대 규칙
+1. **총 분량: A4 2.5페이지 분량** (커버 제외)
+2. 모든 설명은 **1~2줄 이내**
+3. 중복 내용은 **전부 삭제**
+4. "~니다" ❌ "~해요/~죠/~네요" ✅
+5. 숫자가 있으면 **반드시 포함** (예: 70% → 10개 중 7개)
+6. 하위 항목은 **공백 2개 들여쓰기!**
+
+지금 바로 쓸 수 있게, 깔끔하게, 친근하게 작성해주세요! 🎉`;
+
+                // Gemini API 호출
+                const playbookResult = await callGeminiAPI(prompt);
+
+                if (!playbookResult) {
+                    throw new Error('플레이북 생성 실패');
+                }
+
+                // PDF 생성
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                
+                const today = new Date().toLocaleDateString('ko-KR');
+                const fileName = uploadedFiles[currentFileIndex]?.name || '데이터';
+                
+                // 표지 페이지
+                const coverDiv = document.createElement('div');
+                coverDiv.style.cssText = `
+                    width: 794px;
+                    height: 1123px;
+                    background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+                    padding: 80px;
+                    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+                    position: fixed;
+                    left: -9999px;
+                    top: 0;
+                    color: white;
+                `;
+                coverDiv.innerHTML = `
+                    <div style="text-align: center; margin-top: 120px;">
+                        <div style="font-size: 72px; margin-bottom: 40px;">🔥</div>
+                        <h1 style="font-size: 48px; margin-bottom: 30px; font-weight: 700; color: white;">
+                            성공 플레이북
+                        </h1>
+                        <div style="font-size: 28px; margin-bottom: 80px; opacity: 0.95; color: white;">
+                            데이터가 알려주는 정답
+                        </div>
+                        <div style="width: 80%; height: 3px; background: rgba(255,255,255,0.5); margin: 80px auto;"></div>
+                        <div style="font-size: 20px; opacity: 0.9; margin-bottom: 15px; color: white;">
+                            📊 ${fileName}
+                        </div>
+                        <div style="font-size: 18px; opacity: 0.9; color: white;">
+                            📅 ${today}
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(coverDiv);
+                
+                const coverCanvas = await html2canvas(coverDiv, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#9C27B0'
+                });
+                
+                const coverImgData = coverCanvas.toDataURL('image/png');
+                doc.addImage(coverImgData, 'PNG', 0, 0, 210, 297);
+                document.body.removeChild(coverDiv);
+
+                // 플레이북 내용 추가
+                doc.addPage();
+                
+                // 제목
+                const titleDiv = document.createElement('div');
+                titleDiv.style.cssText = `
+                    width: 794px;
+                    height: 100px;
+                    background: white;
+                    padding: 30px;
+                    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+                    position: fixed;
+                    left: -9999px;
+                    top: 0;
+                `;
+                titleDiv.innerHTML = `
+                    <h2 style="font-size: 32px; color: #9C27B0; margin: 0; padding-bottom: 20px; border-bottom: 4px solid #9C27B0;">
+                        🚀 당장 써먹는 실전 가이드
+                    </h2>
+                `;
+                document.body.appendChild(titleDiv);
+                
+                const titleCanvas = await html2canvas(titleDiv, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+                
+                const titleImgData = titleCanvas.toDataURL('image/png');
+                doc.addImage(titleImgData, 'PNG', 0, 0, 210, 35);
+                document.body.removeChild(titleDiv);
+
+                // 플레이북 본문 캡처
+                const playbookDiv = document.createElement('div');
+                playbookDiv.className = 'prime-analysis-result';
+                playbookDiv.style.cssText = `
+                    width: 794px;
+                    background: white;
+                    padding: 40px;
+                    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+                    position: fixed;
+                    left: -9999px;
+                    top: 0;
+                `;
+                playbookDiv.innerHTML = formatMarkdown(playbookResult);
+                document.body.appendChild(playbookDiv);
+
+                const playbookCanvas = await html2canvas(playbookDiv, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+
+                const imgData = playbookCanvas.toDataURL('image/png');
+                const imgWidth = 170;
+                const imgHeight = (playbookCanvas.height * imgWidth) / playbookCanvas.width;
+                
+                let yPosition = 40;
+                let remainingHeight = imgHeight;
+                let sourceY = 0;
+                
+                while (remainingHeight > 0) {
+                    const availableHeight = 267 - yPosition;
+                    const heightToAdd = Math.min(remainingHeight, availableHeight);
+                    
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = playbookCanvas.width;
+                    tempCanvas.height = (heightToAdd / imgWidth) * playbookCanvas.width;
+                    
+                    const ctx = tempCanvas.getContext('2d');
+                    ctx.drawImage(
+                        playbookCanvas,
+                        0, (sourceY / imgHeight) * playbookCanvas.height,
+                        playbookCanvas.width, (heightToAdd / imgWidth) * playbookCanvas.width,
+                        0, 0,
+                        playbookCanvas.width, (heightToAdd / imgWidth) * playbookCanvas.width
+                    );
+                    
+                    const partialImgData = tempCanvas.toDataURL('image/png');
+                    doc.addImage(partialImgData, 'PNG', 20, yPosition, imgWidth, heightToAdd);
+                    
+                    remainingHeight -= heightToAdd;
+                    sourceY += heightToAdd;
+                    
+                    if (remainingHeight > 0) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+                }
+
+                document.body.removeChild(playbookDiv);
+
+                // PDF 저장
+                const timestamp = new Date().toISOString().slice(0, 10);
+                doc.save(`성공_플레이북_${timestamp}.pdf`);
+                
+                // 버튼 복원
+                originalBtn.disabled = false;
+                originalBtn.textContent = originalText;
+                
+                alert('🔥 플레이북 완성!\n\n커버 포함 4페이지 이내로 핵심만 압축했어요.\n지금 바로 써먹을 수 있는 실전 가이드입니다!');
+
+            } catch (error) {
+                console.error('플레이북 생성 오류:', error);
+                alert('플레이북 생성 중 오류가 발생했습니다: ' + error.message);
+                
+                if (event && event.target) {
+                    event.target.disabled = false;
+                    event.target.textContent = '📘 종합 플레이북 생성';
+                }
+            }
+        }
+
+    </script>
+</body>
+</html>

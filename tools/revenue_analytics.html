@@ -1,0 +1,4234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인터랙티브 피벗 테이블 분석기</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .header-reset-btn {
+            position: absolute;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .header-reset-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-50%) scale(1.05);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border: 3px dashed #667eea;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            min-height: 200px;
+        }
+
+        .upload-section:hover {
+            background: #e9ecef;
+            border-color: #764ba2;
+        }
+
+        .upload-section.drag-over {
+            background: #e7e9ff;
+            border-color: #667eea;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .file-list-section {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .file-list-section.active {
+            display: block;
+        }
+
+        .file-list {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .file-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+
+        .file-list-item:hover {
+            background: #e9ecef;
+        }
+
+        .file-list-item-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .file-list-item-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .file-list-item-size {
+            font-size: 0.85em;
+            color: #6c757d;
+        }
+
+        .file-remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+        }
+
+        .file-remove-btn:hover {
+            background: #c82333;
+        }
+
+        .generate-file-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+            transition: transform 0.2s;
+            font-weight: bold;
+        }
+
+        .generate-file-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .generate-file-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 토스트 알림 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            animation: slideIn 0.3s ease-out;
+            font-weight: 600;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        .toast.hiding {
+            animation: slideOut 0.3s ease-in;
+        }
+
+        /* 데이터 미리보기 버튼 */
+        .file-preview-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s;
+            margin-right: 8px;
+        }
+
+        .file-preview-btn:hover {
+            background: #5568d3;
+        }
+
+        /* 데이터 미리보기 섹션 */
+        .data-preview-section {
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            max-height: 500px;
+            overflow: auto;
+        }
+
+        .data-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .data-preview-title {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .data-preview-close {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+
+        .data-preview-close:hover {
+            background: #c82333;
+        }
+
+        .data-preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        .data-preview-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-preview-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #e9ecef;
+            text-align: left;
+        }
+
+        .data-preview-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .data-preview-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e7f3ff;
+            border-radius: 6px;
+            color: #004085;
+            font-size: 0.9em;
+        }
+
+        /* 병합 완료 후 파일 정보 */
+        .uploaded-files-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #667eea;
+            text-align: left;
+        }
+
+        .uploaded-files-info h4 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+        }
+
+        .uploaded-file-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        /* 업로드된 파일 리스트 (개별 관리용) */
+        .uploaded-files-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .uploaded-file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s;
+        }
+
+        .uploaded-file-item:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .uploaded-file-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .uploaded-file-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .uploaded-file-rows {
+            font-size: 0.85em;
+            color: #6c757d;
+        }
+
+        .uploaded-file-remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .uploaded-file-remove-btn:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .add-more-files-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            margin-top: 15px;
+            transition: all 0.2s;
+        }
+
+        .add-more-files-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        /* 필드 영역 상단의 파일 정보 */
+        .current-files-info {
+            background: linear-gradient(135deg, #e7e9ff 0%, #f0e7ff 100%);
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border: 2px solid #667eea;
+        }
+
+        .current-files-info h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .current-file-tag {
+            display: inline-block;
+            background: white;
+            color: #667eea;
+            padding: 6px 12px;
+            margin: 4px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 500;
+            border: 1px solid #667eea;
+        }
+
+        .file-list-item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .pivot-controls {
+            display: none;
+            margin-bottom: 30px;
+        }
+
+        .fields-header {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            margin-bottom: 20px;
+        }
+
+        .fields-header h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .fields-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .control-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .control-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .drop-zone {
+            min-height: 120px;
+            background: white;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone.drag-over {
+            background: #e7e9ff;
+            border-color: #667eea;
+        }
+
+        .field-item {
+            background: white;
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 6px;
+            cursor: move;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+        }
+
+        .field-item:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+            transform: translateX(5px);
+        }
+
+        .field-item.dragging {
+            opacity: 0.5;
+        }
+
+        .placed-field {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: relative;
+        }
+
+        .placed-field-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .placed-field-value {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .field-name {
+            flex: 1;
+        }
+
+        .remove-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .remove-btn:hover {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .aggregation-select {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 0.8em;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .aggregation-select option {
+            color: #333;
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2em;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+            font-weight: bold;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .result-section.active {
+            display: block;
+        }
+
+        .stats-summary {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .content-split {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .table-section {
+            flex: 1;
+            min-width: 500px;
+        }
+
+        .chart-section {
+            flex: 0 0 40%;
+            min-width: 400px;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .chart-section.hidden {
+            display: none;
+        }
+
+        .chart-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .chart-type-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-type-selector label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .chart-type-selector select {
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 0.95em;
+            cursor: pointer;
+            background: white;
+        }
+
+        .chart-type-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .axis-settings {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .axis-settings.hidden {
+            display: none;
+        }
+
+        .axis-settings h4 {
+            font-size: 0.9em;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .axis-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            margin-bottom: 6px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .axis-item label {
+            font-size: 0.85em;
+            color: #495057;
+            flex: 1;
+        }
+
+        .axis-item select {
+            padding: 4px 8px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+
+        .chart-settings {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .chart-settings.hidden {
+            display: none;
+        }
+
+        .chart-settings h4 {
+            font-size: 0.95em;
+            color: #667eea;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .setting-item {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .setting-item-label {
+            font-size: 0.85em;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        .setting-item select {
+            padding: 6px 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-size: 0.85em;
+            cursor: pointer;
+            background: white;
+        }
+
+        .setting-item select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-container {
+            flex: 1;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        .visualize-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+
+        .visualize-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+
+        .visualize-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 450px;
+            margin-top: 20px;
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.1em;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: 600;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-results-info {
+            margin-top: 10px;
+            color: #6c757d;
+            font-size: 0.95em;
+        }
+
+        .pivot-table-container {
+            overflow-x: auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        @media (max-width: 1200px) {
+            .content-split {
+                flex-direction: column;
+            }
+            
+            .chart-section {
+                flex: 1;
+                min-width: 100%;
+            }
+            
+            .table-section {
+                min-width: 100%;
+            }
+        }
+        }
+
+        .pivot-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        .pivot-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .pivot-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .pivot-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .pivot-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .pivot-table tr:nth-child(even):hover {
+            background: #e9ecef;
+        }
+
+        .number-cell {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            font-weight: 500;
+        }
+
+        .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 30px !important;
+        }
+
+        .sortable-header:hover {
+            background: linear-gradient(135deg, #7c8ef5 0%, #8659b0 100%) !important;
+        }
+
+        .sort-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.9em;
+            opacity: 0.6;
+        }
+
+        .sort-icon.active {
+            opacity: 1;
+        }
+
+        .total-row {
+            background: #e7e9ff !important;
+            font-weight: bold;
+        }
+
+        .export-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .export-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+        }
+
+        .export-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .stats-summary {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .filter-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .filter-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-item label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.9em;
+        }
+
+        .filter-item input,
+        .filter-item select {
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+
+        .date-group-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .date-group-btn {
+            flex: 1;
+            padding: 10px;
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9em;
+        }
+
+        .date-group-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .date-group-btn:hover {
+            border-color: #667eea;
+        }
+
+        .apply-filter-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .apply-filter-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .reset-filter-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .reset-filter-btn:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .reset-pivot-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .reset-pivot-btn:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+        }
+
+        .insight-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .insight-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .insight-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .insight-result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+            text-align: left;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 0.85em;
+        }
+
+        .insight-result.hidden {
+            display: none;
+        }
+
+        .insight-result h3 {
+            color: #667eea;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: 700;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .insight-result h3:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .insight-result h4 {
+            color: #495057;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+            font-weight: 600;
+            padding-left: 10px;
+            border-left: 3px solid #667eea;
+        }
+
+        .insight-result h5 {
+            color: #6c757d;
+            margin-top: 12px;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            padding-left: 20px;
+        }
+
+        .insight-result p {
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .insight-result ul {
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
+        .insight-result li {
+            color: #333;
+            line-height: 1.6;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .insight-loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .control-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .fields-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+
+            .filter-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 데이터 분석 AI Tool_by. MGT</h1>
+            <p>CSV/Excel 파일을 업로드하고 드래그 앤 드롭으로 데이터를 분석하세요</p>
+            <button class="header-reset-btn" onclick="location.reload()">🔄 초기화</button>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section" id="uploadSection">
+                <div class="upload-icon">📁</div>
+                <h2>파일을 드래그하거나 클릭하여 업로드</h2>
+                <p style="margin: 15px 0; color: #6c757d;">CSV, Excel (XLS, XLSX) 파일 지원 | 다수의 파일을 업로드할 수 있습니다</p>
+                <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls" multiple>
+                <button class="upload-btn" id="uploadBtn">파일 선택</button>
+                
+                <!-- 파일 목록 섹션 -->
+                <div class="file-list-section" id="fileListSection">
+                    <h3 style="color: #667eea; margin-bottom: 10px;">📋 업로드 대기 중인 파일</h3>
+                    <div class="file-list" id="fileList"></div>
+                    <button class="generate-file-btn" id="generateFileBtn" onclick="processAllFiles()">
+                        🚀 데이터 병합 및 생성
+                    </button>
+                </div>
+            </div>
+
+            <div class="pivot-controls" id="pivotControls">
+                <!-- 사용 가능한 필드 (상단 가로 배치) -->
+                <div class="fields-header">
+                    <h3>📋 사용 가능한 필드</h3>
+                    <div class="fields-grid" id="availableFields"></div>
+                </div>
+
+                <!-- 기간 필터 섹션 -->
+                <div class="filter-section" id="filterSection">
+                    <h3>📅 기간 필터 (선택사항)</h3>
+                    <div class="filter-grid">
+                        <div class="filter-item">
+                            <label>시작일</label>
+                            <input type="date" id="startDate">
+                        </div>
+                        <div class="filter-item">
+                            <label>종료일</label>
+                            <input type="date" id="endDate">
+                        </div>
+                        <div class="filter-item">
+                            <label>일시 그룹핑</label>
+                            <div class="date-group-buttons">
+                                <button class="date-group-btn" data-group="none">없음</button>
+                                <button class="date-group-btn active" data-group="daily">일별</button>
+                                <button class="date-group-btn" data-group="monthly">월별</button>
+                            </div>
+                        </div>
+                        <div class="filter-item">
+                            <button class="apply-filter-btn" onclick="applyDateFilter()">필터 적용</button>
+                        </div>
+                        <div class="filter-item">
+                            <button class="reset-filter-btn" onclick="resetDateFilter()">🔄 기간 필터 초기화</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 행, 열, 값 초기화 버튼 -->
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <button class="reset-pivot-btn" onclick="resetPivotConfig()">🔄 행/열/값 초기화</button>
+                </div>
+
+                <!-- 행, 열, 값 컨트롤 -->
+                <div class="control-grid">
+                    <div class="control-box">
+                        <h3>⬇️ 행 (Rows)</h3>
+                        <div class="drop-zone" id="rowsZone"></div>
+                    </div>
+
+                    <div class="control-box">
+                        <h3>➡️ 열 (Columns)</h3>
+                        <div class="drop-zone" id="columnsZone"></div>
+                    </div>
+
+                    <div class="control-box">
+                        <h3>🔢 값 (Values)</h3>
+                        <div class="drop-zone" id="valuesZone"></div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="generate-btn" id="generateBtn" onclick="generatePivotTable()" style="display: none;">
+                분석 시작
+            </button>
+
+            <div class="result-section" id="resultSection">
+                <!-- 통계 카드는 상단 전체 너비 -->
+                <div class="stats-summary" id="statsSummary"></div>
+                
+                <!-- 표와 차트를 좌우로 분할 -->
+                <div class="content-split">
+                    <div class="table-section">
+                        <div class="search-controls">
+                            <div class="search-container">
+                                <input 
+                                    type="text" 
+                                    class="search-input" 
+                                    id="searchInput" 
+                                    placeholder="🔍 검색어를 입력하세요... (복수 검색: / 로 구분, 예: 56a6c3870b5c/56a6e3f84e689)"
+                                    onkeypress="if(event.key === 'Enter') filterTable()"
+                                >
+                                <button class="search-btn" onclick="filterTable()">🔍 검색하기</button>
+                                <div class="search-results-info" id="searchInfo"></div>
+                            </div>
+                            <button class="visualize-btn" id="visualizeBtn" onclick="toggleChartSection()">
+                                📊 시각화
+                            </button>
+                        </div>
+                        
+                        <div class="pivot-table-container">
+                            <table class="pivot-table" id="pivotTable"></table>
+                        </div>
+
+                        <div class="export-buttons">
+                            <button class="export-btn" onclick="exportToCSV()">📥 CSV로 내보내기</button>
+                            <button class="export-btn" onclick="exportToExcel()">📊 Excel로 내보내기</button>
+                            <button class="export-btn" onclick="exportToGoogleSheets()">📗 구글 시트로 내보내기</button>
+                        </div>
+                    </div>
+
+                    <div class="chart-section hidden" id="chartSection">
+                        <div class="chart-title" id="chartTitle">📊 데이터 시각화</div>
+                        
+                        <!-- 축 및 차트 타입 설정 영역 (값이 1개 이상일 때 표시) -->
+                        <div class="chart-settings hidden" id="chartSettings"></div>
+                        
+                        <div class="chart-container">
+                            <canvas id="dataChart"></canvas>
+                        </div>
+                        
+                        <!-- Insight 버튼 및 결과 영역 -->
+                        <div style="margin-top: 20px; text-align: center;">
+                            <button class="insight-btn" id="insightBtn" onclick="generateInsight()">Insight</button>
+                        </div>
+                        <div class="insight-result hidden" id="insightResult"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawData = [];
+        let filteredData = [];
+        let headers = [];
+        let pivotConfig = {
+            rows: [],
+            columns: [],
+            values: []
+        };
+        let currentPivotData = null;
+        let dateGrouping = 'daily';
+        let selectedDateColumn = '';
+        let dateFilter = {
+            startDate: null,
+            endDate: null
+        };
+        let sortState = {
+            columnIndex: null,
+            direction: null // 'asc' or 'desc'
+        };
+        let chartInstance = null; // 차트 인스턴스
+        let chartTypeConfig = {}; // 각 데이터셋의 차트 타입 설정 {datasetLabel: 'bar' or 'line'}
+        let axisConfig = {}; // 각 데이터셋의 축 설정 {datasetLabel: 'left' or 'right'}
+        let summaryMode = 'total'; // 'total', 'average', 'median' - Summary 행 표시 모드
+        
+        // 다중 파일 업로드 관련 변수
+        let pendingFiles = []; // 업로드 대기 중인 파일들
+        let uploadedFileNames = []; // 병합 완료된 파일명들
+        let fileDataMap = {}; // 각 파일의 데이터를 개별 저장 {파일명: {data: [], rowCount: N}}
+
+        // 파일 업로드 처리
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+
+        // 버튼 클릭만 파일 선택창 열기
+        uploadBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // 이벤트 전파 방지
+            fileInput.click();
+        });
+        
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const target = e.currentTarget;
+            if (target && target.classList) {
+                target.classList.add('drag-over');
+            }
+        });
+
+        uploadSection.addEventListener('dragleave', (e) => {
+            const target = e.currentTarget;
+            if (target && target.classList) {
+                target.classList.remove('drag-over');
+            }
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const target = e.currentTarget;
+            if (target && target.classList) {
+                target.classList.remove('drag-over');
+            }
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) addFilesToList(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) addFilesToList(files);
+        });
+
+        // 파일을 목록에 추가
+        function addFilesToList(files) {
+            let addedCount = 0;
+            
+            files.forEach(file => {
+                const fileName = file.name.toLowerCase();
+                
+                // 파일 형식 검증
+                if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+                    showToast(`❌ ${file.name}은(는) 지원하지 않는 형식입니다`, '#dc3545');
+                    return;
+                }
+                
+                // 중복 파일 체크
+                if (pendingFiles.some(f => f.name === file.name)) {
+                    showToast(`⚠️ ${file.name}은(는) 이미 목록에 있습니다`, '#ffc107');
+                    return;
+                }
+                
+                pendingFiles.push(file);
+                addedCount++;
+            });
+            
+            // 파일 목록 UI 업데이트
+            if (addedCount > 0) {
+                updateFileList();
+                if (addedCount === 1) {
+                    showToast(`✅ ${files[0].name} 추가됨`, '#28a745');
+                } else {
+                    showToast(`✅ ${addedCount}개 파일 추가됨`, '#28a745');
+                }
+            }
+        }
+
+        // 토스트 알림 표시
+        function showToast(message, bgColor = '#28a745') {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            if (bgColor !== '#28a745') {
+                toast.style.background = bgColor;
+            }
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('hiding');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 2500);
+        }
+
+        // 파일 데이터 미리보기
+        async function previewFileData(file, index) {
+            try {
+                const fileName = file.name.toLowerCase();
+                let fileData = [];
+                
+                showToast('📄 데이터 로딩 중...', '#667eea');
+                
+                if (fileName.endsWith('.csv')) {
+                    fileData = await new Promise((resolve, reject) => {
+                        Papa.parse(file, {
+                            header: true,
+                            complete: (results) => {
+                                const cleanData = results.data.filter(row => Object.values(row).some(val => val !== ''));
+                                resolve(cleanData);
+                            },
+                            error: (error) => reject(error)
+                        });
+                    });
+                } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                    fileData = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const data = new Uint8Array(e.target.result);
+                                const workbook = XLSX.read(data, { type: 'array' });
+                                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                                resolve(jsonData);
+                            } catch (error) {
+                                reject(error);
+                            }
+                        };
+                        reader.onerror = () => reject(new Error('파일 읽기 실패'));
+                        reader.readAsArrayBuffer(file);
+                    });
+                }
+                
+                if (fileData.length === 0) {
+                    showToast('⚠️ 데이터가 없습니다', '#ffc107');
+                    return;
+                }
+                
+                // 미리보기 표시
+                displayDataPreview(file.name, fileData);
+                
+            } catch (error) {
+                showToast('❌ 데이터 로딩 실패: ' + error.message, '#dc3545');
+            }
+        }
+
+        // 데이터 미리보기 표시
+        function displayDataPreview(fileName, data) {
+            // 기존 미리보기가 있으면 제거
+            const existingPreview = document.querySelector('.data-preview-section');
+            if (existingPreview) {
+                existingPreview.remove();
+            }
+            
+            const fileListSection = document.getElementById('fileListSection');
+            
+            const previewSection = document.createElement('div');
+            previewSection.className = 'data-preview-section';
+            
+            const header = document.createElement('div');
+            header.className = 'data-preview-header';
+            
+            const title = document.createElement('div');
+            title.className = 'data-preview-title';
+            title.textContent = `📊 ${fileName} 데이터 미리보기`;
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'data-preview-close';
+            closeBtn.textContent = '✕ 닫기';
+            closeBtn.onclick = () => previewSection.remove();
+            
+            header.appendChild(title);
+            header.appendChild(closeBtn);
+            previewSection.appendChild(header);
+            
+            // 정보 표시
+            const info = document.createElement('div');
+            info.className = 'data-preview-info';
+            const displayRows = Math.min(data.length, 100);
+            info.textContent = `총 ${data.length.toLocaleString()}개 행 중 ${displayRows.toLocaleString()}개 행 표시`;
+            previewSection.appendChild(info);
+            
+            // 테이블 생성
+            const table = document.createElement('table');
+            table.className = 'data-preview-table';
+            
+            // 헤더
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = Object.keys(data[0] || {});
+            
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // 데이터 (최대 100행)
+            const tbody = document.createElement('tbody');
+            data.slice(0, 100).forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    const value = row[header];
+                    td.textContent = value !== null && value !== undefined ? value : '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            
+            previewSection.appendChild(table);
+            fileListSection.appendChild(previewSection);
+            
+            // 스크롤을 미리보기로 이동
+            previewSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // 파일 목록 UI 업데이트
+        function updateFileList() {
+            const fileListSection = document.getElementById('fileListSection');
+            const fileList = document.getElementById('fileList');
+            
+            // 요소가 없으면 (이미 제거된 경우) 조용히 종료
+            if (!fileListSection || !fileList) {
+                return;
+            }
+            
+            if (pendingFiles.length === 0) {
+                if (fileListSection.classList) {
+                    fileListSection.classList.remove('active');
+                }
+                return;
+            }
+            
+            if (fileListSection.classList) {
+                fileListSection.classList.add('active');
+            }
+            fileList.innerHTML = '';
+            
+            pendingFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'file-list-item';
+                item.style.animation = 'slideIn 0.3s ease-out';
+                
+                const info = document.createElement('div');
+                info.className = 'file-list-item-info';
+                
+                const name = document.createElement('div');
+                name.className = 'file-list-item-name';
+                name.textContent = file.name;
+                
+                const size = document.createElement('div');
+                size.className = 'file-list-item-size';
+                size.textContent = formatFileSize(file.size);
+                
+                const actions = document.createElement('div');
+                actions.className = 'file-list-item-actions';
+                
+                const previewBtn = document.createElement('button');
+                previewBtn.className = 'file-preview-btn';
+                previewBtn.textContent = '미리보기';
+                previewBtn.onclick = () => previewFileData(file, index);
+                
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'file-remove-btn';
+                removeBtn.textContent = '삭제';
+                removeBtn.onclick = () => {
+                    pendingFiles.splice(index, 1);
+                    updateFileList();
+                    showToast(`✅ ${file.name} 삭제됨`, '#dc3545');
+                };
+                
+                info.appendChild(name);
+                info.appendChild(size);
+                actions.appendChild(previewBtn);
+                actions.appendChild(removeBtn);
+                item.appendChild(info);
+                item.appendChild(actions);
+                fileList.appendChild(item);
+            });
+        }
+
+        // 파일 크기 포맷팅
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // 모든 파일을 병합하여 처리
+        async function processAllFiles() {
+            if (pendingFiles.length === 0) {
+                alert('⚠️ 업로드할 파일이 없습니다.');
+                return;
+            }
+            
+            const uploadSection = document.getElementById('uploadSection');
+            uploadSection.style.opacity = '0.6';
+            uploadSection.innerHTML = '<div class="upload-icon">⏳</div><h2>파일 병합 중...</h2><p>잠시만 기다려주세요...</p>';
+            
+            try {
+                let allData = [];
+                let firstHeaders = null;
+                
+                // 모든 파일을 순차적으로 읽기
+                for (let i = 0; i < pendingFiles.length; i++) {
+                    const file = pendingFiles[i];
+                    const fileName = file.name.toLowerCase();
+                    
+                    let fileData = [];
+                    
+                    if (fileName.endsWith('.csv')) {
+                        // CSV 파일 처리
+                        fileData = await new Promise((resolve, reject) => {
+                            Papa.parse(file, {
+                                header: true,
+                                complete: (results) => {
+                                    const cleanData = results.data.filter(row => Object.values(row).some(val => val !== ''));
+                                    resolve(cleanData);
+                                },
+                                error: (error) => reject(error)
+                            });
+                        });
+                    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                        // Excel 파일 처리
+                        fileData = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                try {
+                                    const data = new Uint8Array(e.target.result);
+                                    const workbook = XLSX.read(data, { type: 'array' });
+                                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                                    resolve(jsonData);
+                                } catch (error) {
+                                    reject(error);
+                                }
+                            };
+                            reader.onerror = () => reject(new Error('파일 읽기 실패'));
+                            reader.readAsArrayBuffer(file);
+                        });
+                    }
+                    
+                    // 빈 데이터 체크
+                    if (fileData.length === 0) {
+                        throw new Error(`${file.name}에 데이터가 없습니다.`);
+                    }
+                    
+                    // 첫 번째 파일의 헤더를 기준으로 설정
+                    const fileHeaders = Object.keys(fileData[0]);
+                    if (firstHeaders === null) {
+                        firstHeaders = fileHeaders;
+                    } else {
+                        // 헤더 일치 여부 확인
+                        const headersMatch = firstHeaders.length === fileHeaders.length && 
+                                           firstHeaders.every(h => fileHeaders.includes(h));
+                        
+                        if (!headersMatch) {
+                            throw new Error(`❌ 파일 구조 불일치!\n\n첫 번째 파일과 ${file.name}의 컬럼이 다릅니다.\n모든 파일의 컬럼 구조가 동일해야 합니다.`);
+                        }
+                    }
+                    
+                    // 데이터 병합 전에 개별 파일 데이터 저장
+                    fileDataMap[file.name] = {
+                        data: fileData,
+                        rowCount: fileData.length
+                    };
+                    
+                    // 데이터 병합
+                    allData = allData.concat(fileData);
+                }
+                
+                // 일시 컬럼에서 시간 정보 제거
+                rawData = processDateColumns(allData);
+                headers = Object.keys(rawData[0] || {});
+                
+                // 업로드된 파일 목록 저장 (전역 변수에)
+                uploadedFileNames = pendingFiles.map(f => f.name);
+                
+                // 초기화
+                initializePivotControls();
+                
+                // 성공 메시지 - 파일 정보 포함
+                uploadSection.style.opacity = '1';
+                uploadSection.innerHTML = `
+                    <div class="upload-icon">✅</div>
+                    <h2 style="color: #28a745;">파일 병합 완료!</h2>
+                    <p style="margin: 15px 0; color: #6c757d;">
+                        ${uploadedFileNames.length}개 파일 병합 완료<br>
+                        총 ${rawData.length.toLocaleString()}개 행, ${headers.length}개 컬럼
+                    </p>
+                    <div class="uploaded-files-info">
+                        <h4 style="margin-bottom: 15px;">📂 업로드된 파일</h4>
+                        <div id="uploadedFilesList" class="uploaded-files-list">
+                            ${uploadedFileNames.map(name => {
+                                const fileInfo = fileDataMap[name];
+                                return `
+                                    <div class="uploaded-file-item">
+                                        <div class="uploaded-file-item-info">
+                                            <span class="uploaded-file-name">📄 ${name}</span>
+                                            <span class="uploaded-file-rows">${fileInfo.rowCount.toLocaleString()}개 행</span>
+                                        </div>
+                                        <button onclick="removeUploadedFile('${name.replace(/'/g, "\\'")}')" class="uploaded-file-remove-btn">삭제</button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                    <button onclick="addMoreFiles()" class="add-more-files-btn">➕ 파일 추가하기</button>
+                `;
+                
+                // 파일 목록 초기화
+                pendingFiles = [];
+                updateFileList();
+                
+                // alert는 마지막에 (화면 업데이트 후)
+                setTimeout(() => {
+                    alert(`✅ 파일 병합 완료!\n\n파일 수: ${uploadedFileNames.length}개\n총 데이터: ${rawData.length.toLocaleString()}개 행\n컬럼: ${headers.length}개`);
+                }, 100);
+                
+            } catch (error) {
+                alert('❌ 파일 처리 실패: ' + error.message);
+                uploadSection.style.opacity = '1';
+                uploadSection.innerHTML = `
+                    <div class="upload-icon">📁</div>
+                    <h2>파일을 드래그하거나 클릭하여 업로드</h2>
+                    <p style="margin: 15px 0; color: #6c757d;">CSV, Excel (XLS, XLSX) 파일 지원 | 다수의 파일을 업로드할 수 있습니다</p>
+                    <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls" multiple>
+                    <button class="upload-btn" id="uploadBtn">파일 선택</button>
+                    <div class="file-list-section" id="fileListSection">
+                        <h3 style="color: #667eea; margin-bottom: 10px;">📋 업로드 대기 중인 파일</h3>
+                        <div class="file-list" id="fileList"></div>
+                        <button class="generate-file-btn" id="generateFileBtn" onclick="processAllFiles()">
+                            🚀 데이터 병합 및 생성
+                        </button>
+                    </div>
+                `;
+                
+                // 이벤트 리스너 재등록
+                const newUploadBtn = document.getElementById('uploadBtn');
+                const newFileInput = document.getElementById('fileInput');
+                newUploadBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    newFileInput.click();
+                });
+                newFileInput.addEventListener('change', (e) => {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) addFilesToList(files);
+                });
+                
+                updateFileList();
+            }
+        }
+
+        function handleFile(file) {
+            const fileName = file.name.toLowerCase();
+            
+            // 업로드 섹션에 로딩 표시
+            const uploadSection = document.getElementById('uploadSection');
+            uploadSection.style.opacity = '0.6';
+            uploadSection.innerHTML = '<div class="upload-icon">⏳</div><h2>파일 처리 중...</h2>';
+            
+            if (fileName.endsWith('.csv')) {
+                Papa.parse(file, {
+                    header: true,
+                    complete: (results) => {
+                        rawData = results.data.filter(row => Object.values(row).some(val => val !== ''));
+                        rawData = processDateColumns(rawData);
+                        headers = Object.keys(rawData[0] || {});
+                        
+                        // 업로드된 파일명 저장
+                        uploadedFileNames = [file.name];
+                        
+                        initializePivotControls();
+                        
+                        // 성공 메시지
+                        uploadSection.style.opacity = '1';
+                        uploadSection.innerHTML = `
+                            <div class="upload-icon">✅</div>
+                            <h2 style="color: #28a745;">업로드 완료!</h2>
+                            <p style="margin: 15px 0; color: #6c757d;">총 ${rawData.length.toLocaleString()}개 행, ${headers.length}개 컬럼</p>
+                            <div class="uploaded-files-info">
+                                <h4>📂 업로드된 파일</h4>
+                                <div>
+                                    <span class="uploaded-file-tag">${file.name}</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        setTimeout(() => {
+                            alert(`✅ 파일 업로드 완료!\n\n파일명: ${file.name}\n데이터: ${rawData.length.toLocaleString()}개 행\n컬럼: ${headers.length}개`);
+                        }, 100);
+                    },
+                    error: (error) => {
+                        alert('❌ CSV 파일 읽기 실패: ' + error.message);
+                        uploadSection.style.opacity = '1';
+                        uploadSection.innerHTML = `
+                            <div class="upload-icon">📁</div>
+                            <h2>파일을 드래그하거나 클릭하여 업로드</h2>
+                            <p style="margin: 15px 0; color: #6c757d;">CSV, Excel (XLS, XLSX) 파일 지원</p>
+                            <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls">
+                            <button class="upload-btn" id="uploadBtn">파일 선택</button>
+                        `;
+                    }
+                });
+            } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                        rawData = processDateColumns(jsonData);
+                        headers = Object.keys(rawData[0] || {});
+                        
+                        // 업로드된 파일명 저장
+                        uploadedFileNames = [file.name];
+                        
+                        initializePivotControls();
+                        
+                        // 성공 메시지
+                        uploadSection.style.opacity = '1';
+                        uploadSection.innerHTML = `
+                            <div class="upload-icon">✅</div>
+                            <h2 style="color: #28a745;">업로드 완료!</h2>
+                            <p style="margin: 15px 0; color: #6c757d;">총 ${rawData.length.toLocaleString()}개 행, ${headers.length}개 컬럼</p>
+                            <div class="uploaded-files-info">
+                                <h4>📂 업로드된 파일</h4>
+                                <div>
+                                    <span class="uploaded-file-tag">${file.name}</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        setTimeout(() => {
+                            alert(`✅ 파일 업로드 완료!\n\n파일명: ${file.name}\n데이터: ${rawData.length.toLocaleString()}개 행\n컬럼: ${headers.length}개`);
+                        }, 100);
+                    } catch (error) {
+                        alert('❌ Excel 파일 읽기 실패: ' + error.message);
+                        uploadSection.style.opacity = '1';
+                        uploadSection.innerHTML = `
+                            <div class="upload-icon">📁</div>
+                            <h2>파일을 드래그하거나 클릭하여 업로드</h2>
+                            <p style="margin: 15px 0; color: #6c757d;">CSV, Excel (XLS, XLSX) 파일 지원</p>
+                            <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls">
+                            <button class="upload-btn" id="uploadBtn">파일 선택</button>
+                        `;
+                    }
+                };
+                reader.onerror = () => {
+                    alert('❌ 파일 읽기 실패');
+                    uploadSection.style.opacity = '1';
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('❌ 지원하지 않는 파일 형식입니다.\nCSV 또는 Excel 파일만 업로드 가능합니다.');
+                uploadSection.style.opacity = '1';
+            }
+        }
+
+        // 일시 컬럼에서 시간 제거하는 함수
+        function processDateColumns(data) {
+            if (data.length === 0) return data;
+            
+            const headers = Object.keys(data[0]);
+            const dateColumns = headers.filter(h => 
+                h.includes('일시') || h.includes('날짜') || h.includes('date') || h.includes('time')
+            );
+            
+            return data.map(row => {
+                const newRow = { ...row };
+                dateColumns.forEach(col => {
+                    if (newRow[col] && typeof newRow[col] === 'string' && newRow[col].includes(' ')) {
+                        // '2025/04/01 00:00:16' → '2025/04/01'
+                        newRow[col] = newRow[col].split(' ')[0];
+                    }
+                });
+                return newRow;
+            });
+        }
+
+        function initializePivotControls() {
+            document.getElementById('pivotControls').style.display = 'block';
+            document.getElementById('generateBtn').style.display = 'block';
+            
+            const availableFields = document.getElementById('availableFields');
+            availableFields.innerHTML = '';
+            
+            // 일시 컬럼 자동 감지
+            selectedDateColumn = '';
+            headers.forEach(header => {
+                const fieldItem = createFieldItem(header);
+                availableFields.appendChild(fieldItem);
+                
+                // 일시 관련 컬럼 자동 감지 (첫 번째 발견된 컬럼을 사용)
+                if (!selectedDateColumn && (header.includes('일시') || header.includes('날짜') || header.includes('date') || header.toLowerCase().includes('time'))) {
+                    selectedDateColumn = header;
+                }
+            });
+
+            pivotConfig = { rows: [], columns: [], values: [] };
+            document.getElementById('rowsZone').innerHTML = '';
+            document.getElementById('columnsZone').innerHTML = '';
+            document.getElementById('valuesZone').innerHTML = '';
+            
+            filteredData = [...rawData];
+            
+            // 일시 그룹핑 버튼 이벤트
+            document.querySelectorAll('.date-group-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.date-group-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    dateGrouping = this.dataset.group;
+                });
+            });
+            
+            // 일시 컬럼 정보 표시
+            if (selectedDateColumn) {
+                console.log('자동 감지된 일시 컬럼:', selectedDateColumn);
+            }
+        }
+
+        function createFieldItem(fieldName) {
+            const div = document.createElement('div');
+            div.className = 'field-item';
+            div.draggable = true;
+            div.dataset.field = fieldName;
+            div.textContent = fieldName;
+
+            div.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', fieldName);
+                div.classList.add('dragging');
+            });
+
+            div.addEventListener('dragend', () => {
+                div.classList.remove('dragging');
+            });
+
+            return div;
+        }
+
+        // 드롭 존 설정
+        ['rowsZone', 'columnsZone', 'valuesZone'].forEach(zoneId => {
+            const zone = document.getElementById(zoneId);
+            
+            if (!zone) return; // 요소가 없으면 스킵
+            
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                const target = e.currentTarget;
+                if (target && target.classList) {
+                    target.classList.add('drag-over');
+                }
+            });
+
+            zone.addEventListener('dragleave', (e) => {
+                const target = e.currentTarget;
+                if (target && target.classList) {
+                    target.classList.remove('drag-over');
+                }
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const target = e.currentTarget;
+                if (target && target.classList) {
+                    target.classList.remove('drag-over');
+                }
+                const fieldName = e.dataTransfer.getData('text/plain');
+                
+                if (zoneId === 'valuesZone') {
+                    addValueField(fieldName, zone);
+                } else {
+                    addField(fieldName, zone, zoneId);
+                }
+            });
+        });
+
+        function addField(fieldName, zone, zoneId) {
+            const existingFields = Array.from(zone.children);
+            if (existingFields.some(f => f.dataset.field === fieldName)) return;
+
+            const placedField = document.createElement('div');
+            placedField.className = 'placed-field';
+            placedField.dataset.field = fieldName;
+            
+            const header = document.createElement('div');
+            header.className = 'placed-field-header';
+            
+            const fieldNameSpan = document.createElement('span');
+            fieldNameSpan.className = 'field-name';
+            fieldNameSpan.textContent = fieldName;
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = () => {
+                placedField.remove();
+                updatePivotConfig();
+            };
+            
+            header.appendChild(fieldNameSpan);
+            header.appendChild(removeBtn);
+            placedField.appendChild(header);
+            zone.appendChild(placedField);
+            
+            updatePivotConfig();
+        }
+
+        function addValueField(fieldName, zone) {
+            // 중복 체크 제거 - 같은 필드를 여러 번 추가 가능
+            
+            // 고유 ID 생성 (필드명 + 타임스탬프)
+            const uniqueId = `${fieldName}_${Date.now()}`;
+
+            const placedField = document.createElement('div');
+            placedField.className = 'placed-field';
+            placedField.dataset.field = fieldName;
+            placedField.dataset.uniqueId = uniqueId;  // 고유 ID 저장
+            
+            // 헤더 (필드명 + 삭제 버튼)
+            const header = document.createElement('div');
+            header.className = 'placed-field-header';
+            
+            const fieldNameSpan = document.createElement('span');
+            fieldNameSpan.className = 'field-name';
+            fieldNameSpan.textContent = fieldName;
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = () => {
+                placedField.remove();
+                updatePivotConfig();
+            };
+            
+            header.appendChild(fieldNameSpan);
+            header.appendChild(removeBtn);
+            
+            // 집계 방법 선택
+            const valueContainer = document.createElement('div');
+            valueContainer.className = 'placed-field-value';
+            
+            const select = document.createElement('select');
+            select.className = 'aggregation-select';
+            select.innerHTML = `
+                <option value="sum">합계</option>
+                <option value="avg">평균</option>
+                <option value="count">개수</option>
+                <option value="unique">유니크 갯수</option>
+                <option value="min">최소값</option>
+                <option value="max">최대값</option>
+            `;
+            select.onchange = () => updatePivotConfig();
+            
+            valueContainer.appendChild(select);
+            
+            placedField.appendChild(header);
+            placedField.appendChild(valueContainer);
+            zone.appendChild(placedField);
+            
+            updatePivotConfig();
+        }
+
+        function updatePivotConfig() {
+            pivotConfig.rows = Array.from(document.getElementById('rowsZone').children)
+                .map(el => el.dataset.field);
+            
+            pivotConfig.columns = Array.from(document.getElementById('columnsZone').children)
+                .map(el => el.dataset.field);
+            
+            pivotConfig.values = Array.from(document.getElementById('valuesZone').children)
+                .map(el => ({
+                    field: el.dataset.field,
+                    aggregation: el.querySelector('.aggregation-select')?.value || 'sum',
+                    uniqueId: el.dataset.uniqueId  // 고유 ID 추가
+                }));
+        }
+
+        function resetPivotConfig() {
+            // 행/열/값 영역 비우기
+            document.getElementById('rowsZone').innerHTML = '';
+            document.getElementById('columnsZone').innerHTML = '';
+            document.getElementById('valuesZone').innerHTML = '';
+            
+            // pivotConfig 초기화
+            pivotConfig.rows = [];
+            pivotConfig.columns = [];
+            pivotConfig.values = [];
+            
+            alert('✅ 행/열/값 설정이 초기화되었습니다.');
+        }
+
+        // 일시 데이터에서 시간 제거 및 포맷팅하는 헬퍼 함수
+        function formatDateString(dateStr, grouping) {
+            if (!dateStr) return '(공백)';
+            
+            // 이미 시간이 제거된 상태이지만, 혹시 모를 경우를 대비
+            const datePart = dateStr.includes(' ') ? dateStr.split(' ')[0] : dateStr;
+            
+            if (grouping === 'daily') {
+                return datePart; // 2025/04/01
+            } else if (grouping === 'monthly') {
+                const parts = datePart.split('/');
+                return `${parts[0]}/${parts[1]}`; // 2025/04
+            }
+            
+            return datePart;
+        }
+
+        function applyDateFilter() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            // 일시 컬럼이 없으면 경고
+            if (!selectedDateColumn) {
+                alert('일시 컬럼을 찾을 수 없습니다. "일시", "날짜", "date" 등의 컬럼명이 필요합니다.');
+                return;
+            }
+
+            // 날짜가 선택되지 않으면 전체 데이터 사용
+            if (!startDate || !endDate) {
+                filteredData = [...rawData];
+                dateFilter = { startDate: null, endDate: null };
+                
+                // 그룹핑만 적용
+                if (dateGrouping !== 'none') {
+                    applyDateGrouping();
+                } else {
+                    // 그룹핑 없음 - 행 초기화
+                    document.getElementById('rowsZone').innerHTML = '';
+                    pivotConfig.rows = [];
+                }
+                
+                alert('전체 데이터가 선택되었습니다.');
+                return;
+            }
+
+            dateFilter = { startDate, endDate };
+
+            // 날짜 필터링
+            filteredData = rawData.filter(row => {
+                const dateStr = row[selectedDateColumn];
+                if (!dateStr) return false;
+                
+                // '2025/04/01' 형식을 '2025-04-01'로 변환하여 비교
+                const rowDate = dateStr.replace(/\//g, '-');
+                
+                return rowDate >= startDate && rowDate <= endDate;
+            });
+
+            if (filteredData.length === 0) {
+                alert('선택한 기간에 해당하는 데이터가 없습니다.');
+                filteredData = [...rawData];
+                return;
+            }
+
+            // 일시 그룹핑 적용
+            if (dateGrouping !== 'none') {
+                applyDateGrouping();
+            } else {
+                // 그룹핑 없음 - 행 초기화
+                document.getElementById('rowsZone').innerHTML = '';
+                pivotConfig.rows = [];
+            }
+
+            alert(`필터 적용 완료: ${filteredData.length}개의 데이터가 선택되었습니다.`);
+        }
+
+        function resetDateFilter() {
+            // 시작일/종료일 초기화
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            
+            // 일시 그룹핑 버튼 초기화 (일별로 리셋)
+            document.querySelectorAll('.date-group-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.group === 'daily') {
+                    btn.classList.add('active');
+                }
+            });
+            dateGrouping = 'daily';
+            
+            // 전체 데이터로 복원
+            filteredData = [...rawData];
+            dateFilter = { startDate: null, endDate: null };
+            
+            // 행 영역 초기화
+            document.getElementById('rowsZone').innerHTML = '';
+            pivotConfig.rows = [];
+            
+            alert('✅ 기간 필터가 초기화되었습니다.');
+        }
+
+        function applyDateGrouping() {
+            // 일시 그룹핑에 따라 데이터 변환
+            filteredData = filteredData.map(row => {
+                const newRow = { ...row };
+                const dateStr = row[selectedDateColumn];
+                if (dateStr) {
+                    if (dateGrouping === 'daily') {
+                        newRow[selectedDateColumn + '_grouped'] = dateStr; // 이미 일별 형식 (2025/04/01)
+                    } else if (dateGrouping === 'monthly') {
+                        const parts = dateStr.split('/');
+                        if (parts.length >= 2) {
+                            newRow[selectedDateColumn + '_grouped'] = `${parts[0]}/${parts[1]}`; // 2025/04
+                        }
+                    }
+                }
+                return newRow;
+            });
+
+            // 행 설정을 그룹핑된 컬럼으로 자동 변경
+            pivotConfig.rows = [selectedDateColumn + '_grouped'];
+            
+            // UI 업데이트
+            const rowsZone = document.getElementById('rowsZone');
+            rowsZone.innerHTML = '';
+            const placedField = document.createElement('div');
+            placedField.className = 'placed-field';
+            placedField.dataset.field = selectedDateColumn + '_grouped';
+            
+            const header = document.createElement('div');
+            header.className = 'placed-field-header';
+            
+            const fieldNameSpan = document.createElement('span');
+            fieldNameSpan.className = 'field-name';
+            fieldNameSpan.textContent = `${dateGrouping === 'daily' ? '일별' : '월별'} ${selectedDateColumn}`;
+            
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = () => {
+                placedField.remove();
+                updatePivotConfig();
+            };
+            
+            header.appendChild(fieldNameSpan);
+            header.appendChild(removeBtn);
+            placedField.appendChild(header);
+            rowsZone.appendChild(placedField);
+            
+            updatePivotConfig();
+        }
+
+        function generatePivotTable() {
+            if (pivotConfig.values.length === 0) {
+                alert('최소 1개의 값(Values) 필드를 추가해주세요!');
+                return;
+            }
+
+            // 정렬 상태 초기화
+            sortState = {
+                columnIndex: null,
+                direction: null
+            };
+
+            const pivotData = createPivotData();
+            currentPivotData = pivotData;
+            renderPivotTable(pivotData);
+            renderStats();
+            
+            // 검색창 초기화
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            const searchInfo = document.getElementById('searchInfo');
+            if (searchInfo) {
+                searchInfo.textContent = '';
+            }
+            
+            // result section 표시
+            const resultSection = document.getElementById('resultSection');
+            if (resultSection) {
+                resultSection.style.display = 'block';
+                if (resultSection.classList) {
+                    resultSection.classList.add('active');
+                }
+            }
+            
+            // 차트 섹션 숨기기 (시각화 버튼 클릭 시 표시)
+            const chartSection = document.getElementById('chartSection');
+            if (chartSection && chartSection.classList) {
+                chartSection.classList.add('hidden');
+            }
+        }
+
+        function createPivotData() {
+            const grouped = {};
+
+            filteredData.forEach(row => {
+                // 행 키 생성
+                const rowKey = pivotConfig.rows.map(r => {
+                    const value = row[r];
+                    return value || '(공백)';
+                }).join('|||');
+                
+                const colKey = pivotConfig.columns.map(c => {
+                    const value = row[c];
+                    return value || '(공백)';
+                }).join('|||');
+                
+                const key = `${rowKey}::${colKey}`;
+
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        rowKey,
+                        colKey,
+                        values: {},
+                        count: 0,
+                        rows: []
+                    };
+                    pivotConfig.values.forEach(v => {
+                        grouped[key].values[v.uniqueId] = [];  // 고유 ID를 키로 사용
+                    });
+                }
+
+                grouped[key].count++;
+                grouped[key].rows.push(row);
+                
+                pivotConfig.values.forEach(v => {
+                    const value = row[v.field];
+                    if (v.aggregation === 'unique') {
+                        // 유니크 값을 위해 모든 값 저장
+                        grouped[key].values[v.uniqueId].push(value);  // 고유 ID 사용
+                    } else {
+                        const numValue = parseFloat(value);
+                        if (!isNaN(numValue)) {
+                            grouped[key].values[v.uniqueId].push(numValue);  // 고유 ID 사용
+                        }
+                    }
+                });
+            });
+
+            const aggregated = {};
+            Object.keys(grouped).forEach(key => {
+                const group = grouped[key];
+                aggregated[key] = {
+                    rowKey: group.rowKey,
+                    colKey: group.colKey,
+                    values: {}
+                };
+
+                pivotConfig.values.forEach(v => {
+                    const values = group.values[v.uniqueId];  // 고유 ID 사용
+                    let result;
+
+                    switch (v.aggregation) {
+                        case 'sum':
+                            result = values.reduce((a, b) => a + b, 0);
+                            break;
+                        case 'avg':
+                            result = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+                            break;
+                        case 'count':
+                            result = group.count;
+                            break;
+                        case 'unique':
+                            // 유니크 개수 계산
+                            result = new Set(values.filter(v => v !== null && v !== undefined && v !== '')).size;
+                            break;
+                        case 'min':
+                            result = values.length > 0 ? Math.min(...values) : 0;
+                            break;
+                        case 'max':
+                            result = values.length > 0 ? Math.max(...values) : 0;
+                            break;
+                        default:
+                            result = 0;
+                    }
+
+                    aggregated[key].values[v.uniqueId] = result;  // 고유 ID 사용
+                });
+            });
+
+            return aggregated;
+        }
+
+        function renderPivotTable(pivotData) {
+            const table = document.getElementById('pivotTable');
+            table.innerHTML = '';
+
+            const uniqueRows = [...new Set(Object.values(pivotData).map(d => d.rowKey))].sort();
+            const uniqueCols = [...new Set(Object.values(pivotData).map(d => d.colKey))].sort();
+
+            // 헤더 생성
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            
+            // No 컬럼 추가
+            const noTh = document.createElement('th');
+            noTh.textContent = 'No';
+            noTh.style.width = '50px';
+            noTh.style.textAlign = 'center';
+            headerRow.appendChild(noTh);
+            
+            pivotConfig.rows.forEach(r => {
+                const th = document.createElement('th');
+                th.textContent = r;
+                headerRow.appendChild(th);
+            });
+
+            let valueColumnIndex = pivotConfig.rows.length + 1; // No 컬럼 추가로 +1
+
+            if (uniqueCols.length === 1 && uniqueCols[0] === '') {
+                pivotConfig.values.forEach((v, idx) => {
+                    const th = document.createElement('th');
+                    th.className = 'sortable-header';
+                    const aggName = {
+                        'sum': '합계',
+                        'avg': '평균',
+                        'count': '개수',
+                        'unique': '유니크 갯수',
+                        'min': '최소값',
+                        'max': '최대값'
+                    }[v.aggregation];
+                    
+                    const colIdx = valueColumnIndex + idx;
+                    th.innerHTML = `${v.field} (${aggName})<span class="sort-icon" id="sort-icon-${colIdx}">↕️</span>`;
+                    th.onclick = () => sortTable(colIdx);
+                    
+                    headerRow.appendChild(th);
+                });
+            } else {
+                let actualCellIndex = valueColumnIndex;  // 실제 셀 인덱스 추적
+                uniqueCols.forEach((col, colIndex) => {
+                    pivotConfig.values.forEach((v, valIndex) => {
+                        const th = document.createElement('th');
+                        th.className = 'sortable-header';
+                        const aggName = {
+                            'sum': '합계',
+                            'avg': '평균',
+                            'count': '개수',
+                            'unique': '유니크 갯수',
+                            'min': '최소값',
+                            'max': '최대값'
+                        }[v.aggregation];
+                        
+                        // 실제 셀 인덱스를 사용 (클로저 문제 방지)
+                        const cellIndex = actualCellIndex;
+                        th.innerHTML = `${col} - ${v.field} (${aggName})<span class="sort-icon" id="sort-icon-${cellIndex}">↕️</span>`;
+                        th.onclick = () => sortTable(cellIndex);
+                        
+                        headerRow.appendChild(th);
+                        actualCellIndex++;  // 다음 셀 인덱스로 증가
+                    });
+                });
+            }
+
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            // 데이터 행 생성
+            const tbody = document.createElement('tbody');
+            
+            // 각 열의 총합 계산
+            const columnTotals = {};
+            pivotConfig.values.forEach(v => {
+                uniqueCols.forEach(colKey => {
+                    const key = `${v.uniqueId}_${colKey}`;  // 고유 ID 사용
+                    columnTotals[key] = [];
+                });
+            });
+
+            // 모든 데이터를 순회하며 열별 값 수집
+            uniqueRows.forEach(rowKey => {
+                uniqueCols.forEach(colKey => {
+                    const key = `${rowKey}::${colKey}`;
+                    const data = pivotData[key];
+                    
+                    if (data) {
+                        pivotConfig.values.forEach(v => {
+                            if (data.values[v.uniqueId] !== undefined) {  // 고유 ID 사용
+                                const totalKey = `${v.uniqueId}_${colKey}`;  // 고유 ID 사용
+                                columnTotals[totalKey].push(data.values[v.uniqueId]);  // 고유 ID 사용
+                            }
+                        });
+                    }
+                });
+            });
+
+            // TOTAL(합계) 행 추가 (맨 위)
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'total-row';
+            totalRow.style.position = 'sticky';
+            totalRow.style.top = '0';
+            totalRow.style.zIndex = '9';
+            
+            // No 컬럼 (빈 셀)
+            const totalNoTd = document.createElement('td');
+            totalNoTd.textContent = '';
+            totalNoTd.style.fontWeight = 'bold';
+            totalNoTd.style.background = '#e7e9ff';
+            totalNoTd.style.textAlign = 'center';
+            totalRow.appendChild(totalNoTd);
+            
+            const totalLabelTd = document.createElement('td');
+            totalLabelTd.textContent = '↻ TOTAL(합계)';
+            totalLabelTd.colSpan = pivotConfig.rows.length;
+            totalLabelTd.style.fontWeight = 'bold';
+            totalLabelTd.style.background = '#e7e9ff';
+            totalLabelTd.style.color = '#333';
+            totalLabelTd.style.textAlign = 'center';
+            totalLabelTd.style.cursor = 'pointer';
+            totalLabelTd.style.transition = 'all 0.2s';
+            totalLabelTd.title = '클릭하여 합계/평균/중간값 전환';
+            
+            // 호버 효과
+            totalLabelTd.addEventListener('mouseenter', () => {
+                totalLabelTd.style.background = '#d0d4ff';
+                totalLabelTd.style.transform = 'scale(1.02)';
+            });
+            totalLabelTd.addEventListener('mouseleave', () => {
+                totalLabelTd.style.background = '#e7e9ff';
+                totalLabelTd.style.transform = 'scale(1)';
+            });
+            
+            // 토글 클릭 이벤트
+            totalLabelTd.addEventListener('click', () => {
+                if (summaryMode === 'total') {
+                    summaryMode = 'average';
+                    totalLabelTd.textContent = '↻ AVER(평균)';
+                } else if (summaryMode === 'average') {
+                    summaryMode = 'median';
+                    totalLabelTd.textContent = '↻ MED(중간값)';
+                } else {
+                    summaryMode = 'total';
+                    totalLabelTd.textContent = '↻ TOTAL(합계)';
+                }
+                updateSummaryRow();
+            });
+            
+            totalRow.appendChild(totalLabelTd);
+
+            uniqueCols.forEach(colKey => {
+                pivotConfig.values.forEach(v => {
+                    const td = document.createElement('td');
+                    td.className = 'number-cell';
+                    td.style.background = '#e7e9ff';
+                    td.style.fontWeight = 'bold';
+                    
+                    const totalKey = `${v.uniqueId}_${colKey}`;  // 고유 ID 사용
+                    const values = columnTotals[totalKey];
+                    
+                    if (values && values.length > 0) {
+                        let totalValue = 0;
+                        
+                        switch (v.aggregation) {
+                            case 'sum':
+                                totalValue = values.reduce((a, b) => a + b, 0);
+                                break;
+                            case 'avg':
+                                totalValue = values.reduce((a, b) => a + b, 0) / values.length;
+                                break;
+                            case 'count':
+                                totalValue = values.reduce((a, b) => a + b, 0);
+                                break;
+                            case 'unique':
+                                totalValue = values.reduce((a, b) => a + b, 0);
+                                break;
+                            case 'min':
+                                totalValue = Math.min(...values);
+                                break;
+                            case 'max':
+                                totalValue = Math.max(...values);
+                                break;
+                        }
+                        
+                        td.textContent = totalValue.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+                    } else {
+                        td.textContent = '-';
+                    }
+                    
+                    totalRow.appendChild(td);
+                });
+            });
+
+            tbody.appendChild(totalRow);
+
+            // 일반 데이터 행들 추가
+            uniqueRows.forEach((rowKey, rowIndex) => {
+                const tr = document.createElement('tr');
+                
+                // No 컬럼 (행 번호)
+                const noTd = document.createElement('td');
+                noTd.textContent = rowIndex + 1;
+                noTd.style.textAlign = 'center';
+                noTd.style.fontWeight = '600';
+                noTd.style.color = '#667eea';
+                tr.appendChild(noTd);
+                
+                const rowValues = rowKey.split('|||');
+                rowValues.forEach(val => {
+                    const td = document.createElement('td');
+                    td.textContent = val;
+                    tr.appendChild(td);
+                });
+
+                uniqueCols.forEach(colKey => {
+                    const key = `${rowKey}::${colKey}`;
+                    const data = pivotData[key];
+
+                    pivotConfig.values.forEach(v => {
+                        const td = document.createElement('td');
+                        td.className = 'number-cell';
+                        if (data && data.values[v.uniqueId] !== undefined) {  // 고유 ID 사용
+                            const value = data.values[v.uniqueId];  // 고유 ID 사용
+                            td.textContent = typeof value === 'number' ? 
+                                value.toLocaleString('ko-KR', { maximumFractionDigits: 2 }) : value;
+                        } else {
+                            td.textContent = '-';
+                        }
+                        tr.appendChild(td);
+                    });
+                });
+
+                tbody.appendChild(tr);
+            });
+
+            table.appendChild(tbody);
+        }
+
+        function renderStats() {
+            const statsDiv = document.getElementById('statsSummary');
+            statsDiv.innerHTML = '';
+
+            const stats = [
+                { label: '총 데이터 수', value: filteredData.length.toLocaleString() },
+                { label: '행 그룹', value: pivotConfig.rows.length },
+                { label: '열 그룹', value: pivotConfig.columns.length },
+                { label: '집계 항목', value: pivotConfig.values.length }
+            ];
+
+            stats.forEach(stat => {
+                const card = document.createElement('div');
+                card.className = 'stat-card';
+                card.innerHTML = `
+                    <div class="stat-value">${stat.value}</div>
+                    <div class="stat-label">${stat.label}</div>
+                `;
+                statsDiv.appendChild(card);
+            });
+        }
+
+        function filterTable() {
+            const searchInput = document.getElementById('searchInput').value.toLowerCase();
+            const table = document.getElementById('pivotTable');
+            const tbody = table.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            // '/'로 구분된 검색어들을 배열로 변환 (공백 제거)
+            const searchTerms = searchInput.split('/').map(term => term.trim()).filter(term => term !== '');
+            
+            let visibleCount = 0;
+            let totalCount = rows.length;
+            const totalRow = rows[0]; // TOTAL 행
+            
+            // 보이는 행들만 저장
+            const visibleRows = [];
+            
+            rows.forEach((row, index) => {
+                // 첫 번째 행은 TOTAL(합계) 행이므로 항상 표시
+                if (index === 0) {
+                    row.style.display = '';
+                    return;
+                }
+                
+                const rowText = row.textContent.toLowerCase();
+                
+                // 검색어가 없으면 모두 표시
+                if (searchTerms.length === 0) {
+                    row.style.display = '';
+                    visibleCount++;
+                    visibleRows.push(row);
+                    return;
+                }
+                
+                // 검색어 중 하나라도 포함되면 표시 (OR 조건)
+                const isMatch = searchTerms.some(term => rowText.includes(term));
+                
+                if (isMatch) {
+                    row.style.display = '';
+                    visibleCount++;
+                    visibleRows.push(row);
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            // TOTAL 행 업데이트 (보이는 행들만 집계)
+            updateTotalRow(totalRow, visibleRows);
+            
+            // 검색 결과 정보 표시
+            const searchInfo = document.getElementById('searchInfo');
+            if (searchTerms.length === 0) {
+                searchInfo.textContent = '';
+            } else {
+                const termsText = searchTerms.length > 1 ? `검색어 ${searchTerms.length}개` : `검색어: ${searchTerms[0]}`;
+                searchInfo.textContent = `${termsText} | 결과: ${visibleCount}개 / 전체 ${totalCount - 1}개 행`; // TOTAL 행 제외
+            }
+        }
+        
+        function updateSummaryRow() {
+            const table = document.getElementById('pivotTable');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            const totalRow = rows[0]; // 첫 번째 행 = Summary 행
+            
+            // 레이블 업데이트
+            const labelCell = totalRow.cells[1]; // No(0) 다음 셀
+            if (labelCell) {
+                if (summaryMode === 'total') {
+                    labelCell.textContent = '↻ TOTAL(합계)';
+                } else if (summaryMode === 'average') {
+                    labelCell.textContent = '↻ AVER(평균)';
+                } else if (summaryMode === 'median') {
+                    labelCell.textContent = '↻ MED(중간값)';
+                }
+            }
+            
+            // 보이는 행들만 수집 (TOTAL 행 제외)
+            const visibleRows = [];
+            rows.forEach((row, index) => {
+                if (index !== 0 && row.style.display !== 'none') {
+                    visibleRows.push(row);
+                }
+            });
+            
+            if (visibleRows.length === 0) return;
+            
+            // TOTAL 행과 데이터 행의 셀 인덱스 계산
+            const totalRowStartIndex = 2;  // No(1) + 레이블(1)
+            const dataRowStartIndex = 1 + pivotConfig.rows.length;  // No(1) + 행 필드들
+            const indexOffset = dataRowStartIndex - totalRowStartIndex;
+            
+            const totalCells = totalRow.cells;
+            
+            // 각 값 컬럼별로 집계
+            let valueIndex = 0;
+            for (let totalColIndex = totalRowStartIndex; totalColIndex < totalCells.length; totalColIndex++) {
+                const values = [];
+                
+                // 데이터 행의 해당 컬럼 인덱스 계산
+                const dataColIndex = totalColIndex + indexOffset;
+                
+                // 보이는 행들에서 해당 컬럼의 값 수집
+                visibleRows.forEach(row => {
+                    const cell = row.cells[dataColIndex];
+                    if (cell) {
+                        const cellValue = cell.textContent.trim();
+                        if (cellValue !== '-') {
+                            const numValue = parseFloat(cellValue.replace(/,/g, ''));
+                            if (!isNaN(numValue)) {
+                                values.push(numValue);
+                            }
+                        }
+                    }
+                });
+                
+                // 해당 값 필드의 집계 방식 가져오기
+                const valueConfig = pivotConfig.values[valueIndex % pivotConfig.values.length];
+                let resultValue = 0;
+                
+                if (values.length > 0) {
+                    // summaryMode에 따라 계산 방식 선택
+                    if (summaryMode === 'average') {
+                        // 평균: 모든 값의 평균
+                        resultValue = values.reduce((a, b) => a + b, 0) / values.length;
+                    } else if (summaryMode === 'median') {
+                        // 중간값: 정렬 후 중앙값
+                        const sorted = values.slice().sort((a, b) => a - b);
+                        const mid = Math.floor(sorted.length / 2);
+                        resultValue = sorted.length % 2 === 0 
+                            ? (sorted[mid - 1] + sorted[mid]) / 2 
+                            : sorted[mid];
+                    } else {
+                        // total: 기존 집계 방식대로
+                        switch (valueConfig.aggregation) {
+                            case 'sum':
+                                resultValue = values.reduce((a, b) => a + b, 0);
+                                break;
+                            case 'avg':
+                                resultValue = values.reduce((a, b) => a + b, 0) / values.length;
+                                break;
+                            case 'count':
+                                resultValue = values.reduce((a, b) => a + b, 0);
+                                break;
+                            case 'unique':
+                                resultValue = values.reduce((a, b) => a + b, 0);
+                                break;
+                            case 'min':
+                                resultValue = Math.min(...values);
+                                break;
+                            case 'max':
+                                resultValue = Math.max(...values);
+                                break;
+                        }
+                    }
+                }
+                
+                // Summary 셀 업데이트
+                const summaryCell = totalCells[totalColIndex];
+                if (summaryCell) {
+                    summaryCell.textContent = resultValue.toLocaleString('ko-KR', { maximumFractionDigits: 2 });
+                }
+                
+                valueIndex++;
+            }
+        }
+        
+        // 하위 호환성을 위한 updateTotalRow 함수 (updateSummaryRow 호출)
+        function updateTotalRow(totalRow, visibleRows) {
+            updateSummaryRow();
+        }
+
+        function exportToCSV() {
+            if (!currentPivotData) return;
+
+            const rows = [];
+            const table = document.getElementById('pivotTable');
+            
+            Array.from(table.rows).forEach(row => {
+                const rowData = Array.from(row.cells).map(cell => cell.textContent);
+                rows.push(rowData.join(','));
+            });
+
+            const csv = rows.join('\n');
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `pivot_table_${new Date().getTime()}.csv`;
+            link.click();
+        }
+
+        function exportToExcel() {
+            if (!currentPivotData) return;
+
+            const table = document.getElementById('pivotTable');
+            const wb = XLSX.utils.table_to_book(table, { sheet: 'Pivot Table' });
+            XLSX.writeFile(wb, `pivot_table_${new Date().getTime()}.xlsx`);
+        }
+
+        async function exportToGoogleSheets() {
+            if (!currentPivotData) {
+                alert('❌ 내보낼 데이터가 없습니다!');
+                return;
+            }
+
+            const button = event.target;
+            const originalText = button.textContent;
+            button.textContent = '⏳ 구글 시트 생성 중...';
+            button.disabled = true;
+
+            try {
+                // 피벗 테이블에서 보이는 행만 수집
+                const table = document.getElementById('pivotTable');
+                const allRows = table.querySelectorAll('tr');
+                const visibleRows = [];
+                
+                allRows.forEach(row => {
+                    // display: none이 아닌 행만 선택
+                    if (row.style.display !== 'none') {
+                        visibleRows.push(row);
+                    }
+                });
+
+                console.log('전체 행 개수:', allRows.length);
+                console.log('보이는 행 개수:', visibleRows.length);
+
+                // 최대 행 제한 (10,000 행)
+                const MAX_ROWS = 10000;
+                if (visibleRows.length > MAX_ROWS) {
+                    if (!confirm(`⚠️ 데이터가 너무 많습니다! (${visibleRows.length.toLocaleString()}개 행)\n\n처음 ${MAX_ROWS.toLocaleString()}개 행만 내보내시겠습니까?\n\n취소하면 검색/필터를 사용하여 데이터를 줄여주세요.`)) {
+                        return;
+                    }
+                }
+
+                // 데이터를 2D 배열로 변환
+                const jsonData = [];
+                const rowsToExport = visibleRows.slice(0, MAX_ROWS);
+
+                rowsToExport.forEach(row => {
+                    const cells = row.querySelectorAll('th, td');
+                    const rowData = {};
+                    
+                    cells.forEach((cell, index) => {
+                        rowData[`col${index}`] = cell.textContent.trim();
+                    });
+                    
+                    jsonData.push(rowData);
+                });
+
+                console.log('전송할 데이터:', jsonData.length, '개 행');
+
+                // Google Apps Script URL
+                const scriptUrl = 'https://script.google.com/macros/s/AKfycbwIzqH9VXbHLiFcPmEGLwu_FTDrGnJydxQx_vlJlluBcQkavY3SMulxpjG30aWjC-Z2pQ/exec';
+
+                // FormData를 사용한 POST 전송
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = scriptUrl;
+                form.target = '_blank';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'data';
+                input.value = JSON.stringify(jsonData);
+                
+                form.appendChild(input);
+                document.body.appendChild(form);
+                
+                form.submit();
+                
+                // 폼 제거
+                setTimeout(() => {
+                    document.body.removeChild(form);
+                }, 100);
+
+                showToast(`✅ ${jsonData.length.toLocaleString()}개 행을 구글 시트로 내보냅니다!`, '#28a745');
+
+            } catch (error) {
+                console.error('구글 시트 내보내기 오류:', error);
+                alert(`❌ 구글 시트 생성 실패!\n\n오류: ${error.message}\n\n개발자 도구(F12) 콘솔을 확인하세요.`);
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+
+        function sortTable(columnIndex) {
+            const table = document.getElementById('pivotTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // 첫 번째 행(TOTAL)은 제외하고 정렬
+            const totalRow = rows[0];
+            const dataRows = rows.slice(1);
+            
+            // 정렬 방향 결정
+            if (sortState.columnIndex === columnIndex) {
+                // 같은 컬럼 클릭 시: asc -> desc -> null (원래 순서)
+                if (sortState.direction === 'asc') {
+                    sortState.direction = 'desc';
+                } else if (sortState.direction === 'desc') {
+                    sortState.direction = null;
+                    sortState.columnIndex = null;
+                } else {
+                    sortState.direction = 'asc';
+                }
+            } else {
+                // 다른 컬럼 클릭 시: 오름차순부터 시작
+                sortState.columnIndex = columnIndex;
+                sortState.direction = 'asc';
+            }
+            
+            // 모든 정렬 아이콘 초기화
+            document.querySelectorAll('.sort-icon').forEach(icon => {
+                icon.classList.remove('active');
+                icon.textContent = '↕️';
+            });
+            
+            // 정렬이 없으면 원래 순서로 복원
+            if (sortState.direction === null) {
+                // 피벗 테이블 다시 렌더링
+                renderPivotTable(currentPivotData);
+                return;
+            }
+            
+            // 현재 컬럼 아이콘 업데이트
+            const currentIcon = document.getElementById(`sort-icon-${columnIndex}`);
+            if (currentIcon) {
+                currentIcon.classList.add('active');
+                currentIcon.textContent = sortState.direction === 'asc' ? '▲' : '▼';
+            }
+            
+            // 데이터 정렬
+            dataRows.sort((a, b) => {
+                // cells 배열 접근 전에 존재 여부 확인
+                if (!a.cells[columnIndex] || !b.cells[columnIndex]) {
+                    return 0;
+                }
+                
+                const aValue = a.cells[columnIndex].textContent.trim();
+                const bValue = b.cells[columnIndex].textContent.trim();
+                
+                // '-' 값 처리
+                if (aValue === '-' && bValue === '-') return 0;
+                if (aValue === '-') return 1;
+                if (bValue === '-') return -1;
+                
+                // 숫자로 변환 (쉼표 제거)
+                const aNum = parseFloat(aValue.replace(/,/g, ''));
+                const bNum = parseFloat(bValue.replace(/,/g, ''));
+                
+                // 둘 다 숫자인 경우
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    if (sortState.direction === 'asc') {
+                        return aNum - bNum;
+                    } else {
+                        return bNum - aNum;
+                    }
+                }
+                
+                // 하나만 숫자인 경우
+                if (!isNaN(aNum)) return sortState.direction === 'asc' ? -1 : 1;
+                if (!isNaN(bNum)) return sortState.direction === 'asc' ? 1 : -1;
+                
+                // 둘 다 문자열인 경우
+                if (sortState.direction === 'asc') {
+                    return aValue.localeCompare(bValue, 'ko-KR');
+                } else {
+                    return bValue.localeCompare(aValue, 'ko-KR');
+                }
+            });
+            
+            // tbody 비우고 다시 채우기
+            tbody.innerHTML = '';
+            tbody.appendChild(totalRow);
+            dataRows.forEach(row => tbody.appendChild(row));
+            
+            // 정렬 후에도 보이는 행들만 반영하여 TOTAL 업데이트
+            const visibleRows = dataRows.filter(row => row.style.display !== 'none');
+            updateTotalRow(totalRow, visibleRows);
+        }
+
+        function toggleChartSection() {
+            const chartSection = document.getElementById('chartSection');
+            if (!chartSection || !chartSection.classList) return;
+            
+            if (chartSection.classList.contains('hidden')) {
+                createChart();
+            } else {
+                chartSection.classList.add('hidden');
+            }
+        }
+
+        function createChart() {
+            if (!currentPivotData) {
+                alert('먼저 피벗 테이블을 생성해주세요!');
+                return;
+            }
+
+            // 차트 데이터 준비
+            const table = document.getElementById('pivotTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            
+            // TOTAL 행 제외
+            const totalRow = rows[0];
+            
+            // 보이는 행들만 필터링 (검색/필터 결과 반영)
+            const dataRows = rows.slice(1).filter(row => row.style.display !== 'none');
+            
+            if (dataRows.length === 0) {
+                alert('시각화할 데이터가 없습니다!');
+                return;
+            }
+
+            // X축 레이블 (행 그룹 값들)
+            const labels = [];
+            const datasets = [];
+            
+            // 행 개수와 값 컬럼 개수 파악
+            const rowFieldsCount = pivotConfig.rows.length;
+            const firstRow = dataRows[0];
+            // No 컬럼(1개) + 행 필드들 = 건너뛸 컬럼 수
+            const skipColumns = 1 + rowFieldsCount;
+            const valueCellsCount = firstRow.cells.length - skipColumns;
+            
+            // 행 레이블 추출 (No 컬럼 제외하고 첫 번째 행 필드 사용)
+            dataRows.forEach(row => {
+                // cells[0]은 No 컬럼이므로, cells[1]부터 행 필드 값
+                const label = row.cells[1].textContent;
+                labels.push(label);
+            });
+
+            // 각 값 컬럼별로 데이터셋 생성
+            const barColors = [
+                'rgba(70, 130, 220, 0.75)',    // 진한 파란색
+                'rgba(30, 180, 250, 0.75)',    // 밝은 하늘색
+                'rgba(100, 90, 200, 0.75)',    // 보라빛 파란색
+                'rgba(50, 150, 180, 0.75)',    // 청록색
+                'rgba(80, 110, 230, 0.75)',    // 로얄 블루
+                'rgba(40, 170, 210, 0.75)'     // 밝은 청록색
+            ];
+
+            const lineColors = [
+                'rgba(230, 50, 50, 0.95)',     // 선명한 빨간색
+                'rgba(255, 100, 40, 0.95)',    // 주황빛 빨강
+                'rgba(200, 30, 80, 0.95)',     // 진한 분홍빛 빨강
+                'rgba(255, 70, 120, 0.95)',    // 밝은 핑크
+                'rgba(210, 40, 40, 0.95)',     // 다크 레드
+                'rgba(240, 80, 80, 0.95)'      // 코랄 레드
+            ];
+
+            // 헤더에서 값 컬럼 이름 가져오기
+            const headerRow = table.querySelector('thead tr');
+            const headers = Array.from(headerRow.cells);
+            
+            // 축 및 차트 타입 설정 초기화
+            axisConfig = {};
+            chartTypeConfig = {};
+            
+            let barIndex = 0;
+            let lineIndex = 0;
+            
+            // 값(Values) 컬럼만 반복 (No + 행 필드들 건너뛰기)
+            for (let i = 0; i < valueCellsCount; i++) {
+                const columnIndex = skipColumns + i; // No(1) + 행필드들 + 값 인덱스
+                const data = [];
+                
+                dataRows.forEach(row => {
+                    const cell = row.cells[columnIndex];
+                    const value = cell.textContent;
+                    // '-'를 0으로 처리, 숫자는 파싱
+                    const numValue = value === '-' ? 0 : parseFloat(value.replace(/,/g, '')) || 0;
+                    data.push(numValue);
+                });
+
+                const columnName = headers[columnIndex].textContent;
+                
+                // 기본 설정: 첫 번째는 막대+왼쪽, 나머지는 막대+왼쪽
+                const defaultType = i === 0 ? 'bar' : 'bar';
+                axisConfig[columnName] = 'left';
+                chartTypeConfig[columnName] = defaultType;
+                
+                // 차트 타입에 따라 색상 선택
+                let color;
+                if (defaultType === 'bar') {
+                    color = barColors[barIndex % barColors.length];
+                    barIndex++;
+                } else {
+                    color = lineColors[lineIndex % lineColors.length];
+                    lineIndex++;
+                }
+                
+                datasets.push({
+                    label: columnName,
+                    data: data,
+                    backgroundColor: color,
+                    borderColor: color.replace(/[\d.]+\)$/g, '1)'), // 불투명도를 1로
+                    borderWidth: 2,
+                    tension: 0.4,
+                    yAxisID: axisConfig[columnName],
+                    type: chartTypeConfig[columnName]
+                });
+            }
+
+            // 차트 섹션 표시
+            const chartSection = document.getElementById('chartSection');
+            if (chartSection && chartSection.classList) {
+                chartSection.classList.remove('hidden');
+            }
+
+            // 차트 제목 설정
+            const chartTitle = document.getElementById('chartTitle');
+            if (chartTitle) {
+                chartTitle.textContent = `📊 ${pivotConfig.rows.join(', ')} 기준 데이터 시각화`;
+            }
+
+            // 차트 설정 UI 표시
+            renderChartSettings(datasets);
+
+            // 차트 렌더링
+            renderChart(labels, datasets);
+        }
+
+        function renderChartSettings(datasets) {
+            const chartSettings = document.getElementById('chartSettings');
+            
+            if (!chartSettings) return;
+            
+            if (chartSettings.classList) {
+                chartSettings.classList.remove('hidden');
+            }
+            chartSettings.innerHTML = '<h4>📊 차트 설정</h4>';
+            
+            // X축 정보 표시 (고정, 변경 불가)
+            const xAxisInfo = document.createElement('div');
+            xAxisInfo.style.cssText = 'padding: 12px; background: #e7e9ff; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #667eea;';
+            xAxisInfo.innerHTML = `
+                <strong style="color: #667eea;">📍 X축 (고정):</strong> 
+                <span style="color: #333; font-weight: 600;">${pivotConfig.rows.join(', ')}</span>
+                <div style="font-size: 0.85em; color: #6c757d; margin-top: 4px;">
+                    * X축은 행(Rows) 필드로 자동 설정됩니다
+                </div>
+            `;
+            chartSettings.appendChild(xAxisInfo);
+            
+            // 구분선
+            const divider = document.createElement('div');
+            divider.style.cssText = 'border-bottom: 2px solid #e9ecef; margin: 15px 0;';
+            chartSettings.appendChild(divider);
+            
+            // Y축 값들 설정
+            const yAxisTitle = document.createElement('h5');
+            yAxisTitle.textContent = '📈 Y축 값 설정';
+            yAxisTitle.style.cssText = 'color: #667eea; margin-bottom: 10px; font-size: 0.95em;';
+            chartSettings.appendChild(yAxisTitle);
+            
+            datasets.forEach((dataset, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'setting-item';
+                
+                // 레이블
+                const label = document.createElement('div');
+                label.className = 'setting-item-label';
+                label.textContent = dataset.label;
+                
+                // 차트 타입 선택
+                const typeSelect = document.createElement('select');
+                typeSelect.innerHTML = `
+                    <option value="bar" ${chartTypeConfig[dataset.label] === 'bar' ? 'selected' : ''}>막대</option>
+                    <option value="line" ${chartTypeConfig[dataset.label] === 'line' ? 'selected' : ''}>선</option>
+                `;
+                typeSelect.onchange = (e) => {
+                    chartTypeConfig[dataset.label] = e.target.value;
+                    updateChart();
+                };
+                
+                // 축 선택 (값이 2개 이상일 때만 의미 있음)
+                const axisSelect = document.createElement('select');
+                if (datasets.length >= 2) {
+                    axisSelect.innerHTML = `
+                        <option value="left" ${axisConfig[dataset.label] === 'left' ? 'selected' : ''}>왼쪽 축</option>
+                        <option value="right" ${axisConfig[dataset.label] === 'right' ? 'selected' : ''}>오른쪽 축</option>
+                    `;
+                    axisSelect.onchange = (e) => {
+                        axisConfig[dataset.label] = e.target.value;
+                        updateChart();
+                    };
+                } else {
+                    // 값이 1개면 축 선택 비활성화
+                    axisSelect.innerHTML = `<option value="left">왼쪽 축</option>`;
+                    axisSelect.disabled = true;
+                }
+                
+                itemDiv.appendChild(label);
+                itemDiv.appendChild(typeSelect);
+                itemDiv.appendChild(axisSelect);
+                chartSettings.appendChild(itemDiv);
+            });
+        }
+
+        function renderChart(labels, datasets) {
+            // 기존 차트가 있으면 제거
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            // 색상 배열
+            const barColors = [
+                'rgba(70, 130, 220, 0.75)',
+                'rgba(30, 180, 250, 0.75)',
+                'rgba(100, 90, 200, 0.75)',
+                'rgba(50, 150, 180, 0.75)',
+                'rgba(80, 110, 230, 0.75)',
+                'rgba(40, 170, 210, 0.75)'
+            ];
+
+            const lineColors = [
+                'rgba(230, 50, 50, 0.95)',
+                'rgba(255, 100, 40, 0.95)',
+                'rgba(200, 30, 80, 0.95)',
+                'rgba(255, 70, 120, 0.95)',
+                'rgba(210, 40, 40, 0.95)',
+                'rgba(240, 80, 80, 0.95)'
+            ];
+
+            // 오른쪽 축을 사용하는 데이터셋이 있는지 확인
+            const hasRightAxis = datasets.some(ds => axisConfig[ds.label] === 'right');
+
+            let barIndex = 0;
+            let lineIndex = 0;
+
+            // 각 데이터셋에 축 ID와 차트 타입 설정
+            datasets.forEach(ds => {
+                ds.yAxisID = axisConfig[ds.label];
+                ds.type = chartTypeConfig[ds.label];
+                
+                // 차트 타입에 따라 색상 재설정
+                let color;
+                if (ds.type === 'bar') {
+                    color = barColors[barIndex % barColors.length];
+                    barIndex++;
+                } else {
+                    color = lineColors[lineIndex % lineColors.length];
+                    lineIndex++;
+                }
+                
+                ds.backgroundColor = color;
+                ds.borderColor = color.replace(/[\d.]+\)$/g, '1)'); // 불투명도를 1로
+                
+                // 선 그래프일 때는 fill 없음, 막대일 때는 배경색 적용
+                if (ds.type === 'line') {
+                    ds.fill = false;
+                    ds.pointRadius = 4;
+                    ds.pointHoverRadius = 6;
+                    ds.borderWidth = 3; // 선을 더 굵게
+                    ds.order = 1; // 선은 나중에 그려져서 앞에 표시됨
+                } else {
+                    ds.fill = true;
+                    ds.borderWidth = 2;
+                    ds.order = 2; // 막대는 먼저 그려져서 뒤에 표시됨
+                }
+            });
+
+            // 데이터셋 정렬: order 값이 큰 것부터 (막대가 먼저, 선이 나중에)
+            datasets.sort((a, b) => b.order - a.order);
+
+            // 차트 생성
+            const ctx = document.getElementById('dataChart').getContext('2d');
+            
+            const scales = {
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        font: {
+                            size: 10
+                        }
+                    }
+                },
+                left: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('ko-KR');
+                        }
+                    }
+                }
+            };
+
+            // 오른쪽 축이 필요한 경우에만 추가
+            if (hasRightAxis) {
+                scales.right = {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: {
+                        drawOnChartArea: false // 격자선 겹침 방지
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('ko-KR');
+                        }
+                    }
+                };
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar', // 기본 타입 (각 데이터셋에서 개별 설정됨)
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 9
+                                },
+                                padding: 8,
+                                boxWidth: 12,
+                                boxHeight: 12
+                            },
+                            padding: {
+                                bottom: 90  // 범례와 차트 사이 여백
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed.y.toLocaleString('ko-KR');
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: scales,
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            if (!currentPivotData || !chartInstance) return;
+
+            // 현재 차트의 데이터로 다시 렌더링
+            const labels = chartInstance.data.labels;
+            const datasets = chartInstance.data.datasets;
+            
+            renderChart(labels, datasets);
+        }
+
+        async function generateInsight() {
+            const insightBtn = document.getElementById('insightBtn');
+            const insightResult = document.getElementById('insightResult');
+            
+            if (!currentPivotData || !chartInstance) {
+                alert('먼저 차트를 생성해주세요!');
+                return;
+            }
+
+            // API 키 확인
+            let apiKey = localStorage.getItem('groq_api_key');
+            
+            if (!apiKey) {
+                apiKey = prompt('Groq API 키를 입력해주세요:\n\n(https://console.groq.com 에서 발급 가능)\n\n* 입력한 키는 브라우저에 저장되어 다음부터는 자동으로 사용됩니다.');
+                
+                if (!apiKey) {
+                    return; // 취소
+                }
+                
+                // API 키 저장
+                localStorage.setItem('groq_api_key', apiKey.trim());
+            }
+
+            // 버튼 비활성화
+            insightBtn.disabled = true;
+            insightBtn.textContent = '분석 중...';
+
+            // 결과 영역 표시
+            insightResult.classList.remove('hidden');
+            insightResult.innerHTML = '<div class="insight-loading">데이터를 분석하고 있습니다...</div>';
+
+            try {
+                // 현재 테이블 데이터 수집
+                const table = document.getElementById('pivotTable');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                
+                // TOTAL 행 제외, 보이는 행만
+                const dataRows = rows.slice(1).filter(row => row.style.display !== 'none');
+                
+                // 헤더 정보
+                const headerRow = table.querySelector('thead tr');
+                const headers = Array.from(headerRow.cells).map(cell => cell.textContent);
+                
+                // 데이터 행 정보 (최대 100개)
+                const sampleData = dataRows.slice(0, 100).map(row => {
+                    return Array.from(row.cells).map(cell => cell.textContent);
+                });
+
+                // TOTAL 행 데이터
+                const totalRow = rows[0];
+                const totalData = Array.from(totalRow.cells).map(cell => cell.textContent);
+
+                // 통계 정보 추가 (수치형 컬럼만)
+                const numericColumns = [];
+                headers.forEach((header, idx) => {
+                    if (idx > 0) { // 첫 번째 컬럼(행 제목) 제외
+                        const values = dataRows.map(row => {
+                            const text = row.cells[idx].textContent.replace(/,/g, '');
+                            return parseFloat(text);
+                        }).filter(v => !isNaN(v));
+                        
+                        if (values.length > 0) {
+                            values.sort((a, b) => a - b);
+                            const sum = values.reduce((a, b) => a + b, 0);
+                            const avg = sum / values.length;
+                            const median = values[Math.floor(values.length / 2)];
+                            
+                            numericColumns.push({
+                                name: header,
+                                count: values.length,
+                                sum: sum.toFixed(2),
+                                avg: avg.toFixed(2),
+                                median: median.toFixed(2),
+                                min: values[0].toFixed(2),
+                                max: values[values.length - 1].toFixed(2),
+                                top10: values.slice(-10).reverse().map(v => v.toFixed(2)),
+                                bottom10: values.slice(0, 10).map(v => v.toFixed(2))
+                            });
+                        }
+                    }
+                });
+
+                // 프롬프트 생성
+                const prompt = `당신은 데이터 분석 분야에서 15년 경력의 최고 전문가입니다. 확인되지 않은 사실을 확신에 차서 단정 짓지 말고, 추측이 불가피할 경우 "추측입니다"라고 밝혀주세요.
+
+# 현재 분석 데이터
+
+## 피벗 테이블 설정
+- **행(Row)**: ${pivotConfig.rows.join(', ')}
+- **열(Column)**: ${pivotConfig.columns.length > 0 ? pivotConfig.columns.join(', ') : '없음'}
+- **값(Value)**: ${pivotConfig.values.map(v => `${v.field} (${v.aggregation})`).join(', ')}
+
+## 데이터 헤더
+${headers.join(' | ')}
+
+## TOTAL(합계) 행
+${totalData.join(' | ')}
+
+## 통계 정보
+${numericColumns.map(col => `
+**${col.name}**
+- 데이터 수: ${col.count}개
+- 합계: ${col.sum}
+- 평균: ${col.avg}
+- 중앙값: ${col.median}
+- 최소값: ${col.min}
+- 최대값: ${col.max}
+- 상위 10개: ${col.top10.join(', ')}
+- 하위 10개: ${col.bottom10.join(', ')}
+`).join('\n')}
+
+## 샘플 데이터 (${sampleData.length}개 행)
+${sampleData.slice(0, 50).map((row, i) => `${i+1}. ${row.join(' | ')}`).join('\n')}
+
+---
+
+# 분석 요청사항
+
+## ✅ 필수 조건
+1. 답변하기 전, 단계별로 가능한 정보를 검증하고, 최종적으로 확실한 정보만 사용하여 분석을 완성하세요.
+2. 확인되지 않은 사실을 확신에 차서 단정 짓지 말고, 추측이 필요한 경우 근거와 함께 제시하세요.
+3. **모든 발견 사항에는 반드시 "왜 그런지" 원인 추론이 포함되어야 합니다.**
+   - ❌ "매출이 증가했습니다" (단순 서술)
+   - ✅ "매출이 23% 증가했는데, 이는 (1) 신규 고객 유입 증가 (2) 객단가 상승 때문으로 추론됩니다" (해석 + 원인 분석)
+4. 상세하고 깊이있는 내용으로 작성하되, 쉬운 언어와 표현을 사용하세요.
+5. 단순히 데이터를 나열하지 말고, 그 데이터가 비즈니스에 무엇을 의미하는지 항상 해석하세요.
+6. **종합 전략 제안 시 타 회사 사례는 반드시:**
+   - 회사명 + 구체적 기획명
+   - 상세한 기획 내용 (어떻게 실행했는지)
+   - 투자 규모 (금액/인력/기간)
+   - 성과 지표 (Before → After → 변화율)
+   - 출처 URL (하이퍼링크)
+7. **사례와 예시를 명확히 분리:**
+   - 사례 = 타 회사 실제 사례 (과거형, 출처 있음)
+   - 예시 = 현재 데이터 기반 실행 가능한 액션 아이디어 (현재/미래형)
+
+## ✅ 분석 순서
+
+1. **데이터 목적 추론**
+   - 이 데이터가 어떤 목적(마케팅, 영업, 운영 등)을 위한 것인지 추론
+   
+2. **모든 지표의 정의 작성 (필수)**
+   - 현재 분석 중인 모든 측정값(합계, 평균, 유니크 개수 등)을 하나씩 정의
+   - 각 지표가 비즈니스에서 무엇을 의미하는지 명확히 설명
+   - 예: "콘텐츠ID(유니크 개수) = 기간 동안 실제 판매된 고유 상품 종류 수"
+   
+3. **파생 지표 생성**
+   - 기존 지표 간의 연산으로 파생 지표를 생성 (예: 이익률, 단가, 효율성 등)
+   
+4. **차원/측정값 분류 및 집계**
+   - 문자열/범주형 필드는 차원(Dimension), 수치형 필드는 측정값(Measure)으로 분류
+   - 차원 × 측정값 조합으로 집계 분석
+   
+5. **상관관계 분석**
+   - 모든 측정값 간 상관관계를 분석
+   - 당연한 관계(예: 매출 vs 이익)는 생략하고 특이한 조합만 선별
+   
+6. **우선순위 기반 인사이트 10개 (깊이 있는 분석 필수)**
+   - 단순히 "변동합니다"가 아니라 "왜 그런지" 원인 추론 2가지 이상 필수
+   - 비정상적인 패턴 또는 기회가 보이는 구간 우선
+   - 특정 차원이나 측정값에 치우치지 말고 분석 목적에 맞추어 두루두루 검토
+   - 일반적인 검토결과보다 대안과 연계될 수 있는 복합적인 분석결과 도출
+   - 상관관계, 차원-측정값 조합 분석으로 보았을 때 가장 유의미하고, 액션아이템이 시급한 10가지 선정
+   
+7. **구체적 액션 아이템**
+   - 각 인사이트에 대해 간단한 이유와 함께 구체적인 실행 액션 아이템 작성
+   
+8. **상세 분석**
+   - 10개 인사이트와 액션아이템 다음에는 한 뎁스 더 상세한 분석을 다시 수행
+   - 좀 더 실질적인 상세 분석과 액션아이템 제공
+
+---
+
+# 출력 형식
+
+아래 형식으로 작성하되, 마크다운 제목 레벨을 정확히 지켜주세요.
+
+## 1. 데이터 목적 및 배경
+
+### 1.1 비즈니스 맥락
+이 데이터의 목적과 비즈니스 맥락을 추론하여 설명합니다.
+
+### 1.2 각 지표의 정의 및 의미
+**현재 분석 중인 모든 지표를 하나씩 정의하세요:**
+
+예시 형식:
+- **판매금액(합계)**: 특정 기간 동안 발생한 총 매출액을 의미하며, 비즈니스 규모를 나타냅니다.
+- **콘텐츠ID(유니크 개수)**: 기간 동안 실제 판매가 발생한 고유 상품/콘텐츠의 종류 수를 의미하며, 제품 포트폴리오의 다양성을 나타냅니다.
+- **구매자수(유니크 개수)**: 실제 구매한 고유 고객의 수를 의미하며, 고객 베이스의 크기를 나타냅니다.
+
+**위 형식으로 현재 데이터의 모든 측정값을 정의하세요.**
+
+## 2. 주요 파생 지표
+
+기존 지표를 조합하여 생성 가능한 파생 지표를 나열하고, 각각이 무엇을 의미하는지 설명합니다.
+예: 
+- 이익률 = 이익 ÷ 매출 (수익성 지표)
+- 단가 = 매출 ÷ 수량 (평균 판매가)
+- 고객당 매출 = 총매출 ÷ 고객수 (ARPU)
+
+## 3. 상위 10개 핵심 인사이트
+
+각 인사이트는 다음 구조로 작성:
+
+### 인사이트 1: [구체적이고 명확한 제목]
+
+**발견 사항:** 
+구체적 수치와 함께 현상을 설명합니다. 단순히 "변동합니다"가 아니라 "A에서 B로 X% 증가/감소했습니다"로 작성하세요.
+
+**해석 및 원인 추론:**
+왜 이런 현상이 발생했는지 논리적으로 추론합니다. 
+- ❌ "906에서 1,304 사이로 변동하는 것으로 나타났습니다"
+- ✅ "906에서 1,304로 44% 증가했는데, 이는 (1) 신규 상품 출시가 활발했거나, (2) 시즌 프로모션으로 다양한 상품이 판매되었거나, (3) 고객의 니즈가 다양화되었기 때문으로 추론됩니다"
+
+**중요한 이유:** 
+이것이 비즈니스에 왜 중요한지 명확히 설명합니다.
+
+**액션 아이템:**
+- **단기(1개월 이내)**: 구체적이고 즉시 실행 가능한 행동 방안
+- **중기(3-6개월)**: 전략적 방향
+
+(인사이트 2~10도 동일한 형식으로 작성)
+
+## 4. 상세 분석 및 추가 액션 아이템
+
+위 10개 인사이트를 기반으로 더욱 깊이 있는 분석을 수행합니다.
+
+### 4.1 [주제]
+상세한 분석 내용과 구체적인 실행 방안
+
+### 4.2 [주제]
+(계속...)
+
+## 5. 종합 전략 제안
+
+우선순위 기준으로 정리된 실행 로드맵을 제안합니다.
+
+**각 전략마다 반드시 포함해야 할 내용:**
+
+### 형식 (반드시 준수):
+
+#### 우선순위 N: [전략명]
+
+**실행 아이디어:**
+- 구체적인 실행 방법 1
+- 구체적인 실행 방법 2
+
+**타 회사 실제 사례:**
+
+**[회사명] - [구체적인 기획/프로젝트명]**
+
+**기획 내용:** 
+무엇을 어떻게 했는지 구체적으로 설명 (예: "고객 세그먼트를 5개로 나누고, 각 세그먼트별로 맞춤형 이메일 캠페인을 설계. 주 3회 발송에서 AI 기반 최적 타이밍 발송으로 전환")
+
+**투자 규모:** 
+구체적인 투자 금액 또는 리소스 (예: "마케팅 예산 $2.5M 투입, 6개월 프로젝트")
+
+**성과:**
+- 지표 1: [이전 수치] → [이후 수치] ([변화율])
+- 지표 2: [이전 수치] → [이후 수치] ([변화율])
+- ROI: [구체적 수치]
+
+**출처:** [실제 URL 하이퍼링크]
+
+**현재 데이터 적용 예시:**
+
+우리 데이터를 기반으로 한 구체적이고 실행 가능한 액션 아이디어:
+1. [구체적 액션 1]: [어떻게 실행할 것인지 상세히]
+2. [구체적 액션 2]: [어떻게 실행할 것인지 상세히]
+3. [구체적 액션 3]: [어떻게 실행할 것인지 상세히]
+
+**예상 성과:**
+- 현재: [구체적 지표] = [현재 수치]
+- 목표: [구체적 지표] = [목표 수치]
+- 증가율: X% 향상
+- 예상 투자: [금액/리소스]
+- 예상 ROI: [배수]
+
+---
+
+(우선순위 2, 3, ... 동일한 형식으로 작성)
+
+---
+
+# 작성 가이드라인
+
+**반드시 준수:**
+
+## ❌ 절대 금지 표현
+- "~로 나타났습니다", "~로 보입니다", "~인 것으로 확인됩니다" (단순 서술)
+- "참고할 수 있습니다", "도움이 될 것입니다", "고려해볼 만합니다" (애매한 표현)
+- "변동합니다", "다릅니다", "차이가 있습니다" (해석 없는 사실 나열)
+
+## ✅ 필수 사용 패턴
+1. **수치 비교 시**: 반드시 %나 배수로 표현
+   - ✅ "A는 B보다 23% 높습니다" 
+   - ✅ "906에서 1,304로 44% 증가했습니다"
+   - ✅ "2.3배 더 많습니다"
+
+2. **현상 발견 시**: 반드시 "왜 그런지" 원인 추론 포함
+   - ❌ "매출이 증가했습니다"
+   - ✅ "매출이 23% 증가했는데, 이는 (1) 신규 고객 유입 증가 (2) 객단가 상승 때문으로 추론됩니다"
+
+3. **액션 제안 시**: 단정적이고 구체적으로
+   - ❌ "검토해볼 수 있습니다"
+   - ✅ "즉시 중단해야 합니다", "우선적으로 투자해야 합니다"
+
+4. **지표 언급 시**: 항상 정의와 함께
+   - ❌ "콘텐츠 ID가 증가했습니다"
+   - ✅ "콘텐츠 ID(판매된 고유 상품 종류 수)가 44% 증가했습니다"
+
+## 🎯 분석 깊이 요구사항
+- 모든 발견 사항에는 "왜 그런지" 원인 분석이 2가지 이상 포함되어야 함
+- 단순 수치 나열이 아니라, 그 수치가 의미하는 바를 해석해야 함
+- 비정상적인 패턴이나 기회가 보이는 구간을 우선적으로 다뤄야 함
+- 당연한 사실(예: 매출이 높으면 이익도 높다)은 완전히 생략
+- 초보자도 이해할 수 있도록 쉬운 용어 사용
+- 각 인사이트마다 비즈니스 임팩트를 명확히 설명
+
+## 📊 종합 전략 제안 작성 요구사항
+
+**종합 전략 제안은 반드시 다음을 포함하며, 사례와 예시를 명확히 분리:**
+
+### 1. 타 회사 실제 사례 (필수)
+
+**반드시 포함해야 할 내용:**
+- **회사명 + 구체적인 기획/프로젝트명**: "넷플릭스 개인화 추천 알고리즘 3.0 프로젝트"
+- **기획 내용**: 
+  - ❌ "마케팅 캠페인을 진행했습니다"
+  - ❌ "프로모션을 했습니다"
+  - ✅ "사용자 시청 이력 데이터를 기반으로 80개 변수를 분석하는 머신러닝 모델을 개발. A/B 테스트를 통해 3개월간 100만 사용자 대상 실험. 추천 정확도를 기존 75%에서 93%로 개선하는 알고리즘 배포"
+  
+- **투자 규모**: 
+  - ✅ "개발팀 25명 투입, 6개월 소요, 총 $4.2M 투자"
+  - ✅ "마케팅 예산 $1.5M, 광고비 $800K, 인플루언서 협업 $300K"
+  
+- **성과 지표** (구체적 숫자):
+  - Before → After → 변화율
+  - ✅ "이탈률 8.2% → 3.1% (62% 감소)"
+  - ✅ "MAU 850만 → 1,240만 (46% 증가)"
+  - ✅ "ARPU $12.5 → $17.8 (42% 증가)"
+  - ROI 명시: "투자 대비 3.2배 수익"
+  
+- **출처 URL** (필수): 실제 기사, 케이스 스터디, 공식 발표 링크
+  - 형식: [URL을 하이퍼링크로 제공]
+  - 예: https://netflix.techblog.com/personalization-case-study
+
+### 2. 현재 데이터 적용 예시 (필수, 사례와 별도)
+
+**우리 데이터를 기반으로 한 구체적 액션 아이디어:**
+- ❌ "콘텐츠를 다양화합니다"
+- ❌ "마케팅을 강화합니다"
+- ✅ "상위 10% 콘텐츠 ID를 분석하여 공통 특성(색상, 스타일, 주제) 3가지를 도출. 이 특성을 반영한 신규 콘텐츠 20개를 2주 내 제작. 기존 구매자에게 '맞춤 추천' 푸시 알림 발송. 신규 카테고리 페이지 제작 및 메인 배너 노출 30% 할당"
+
+**명확한 실행 단계:**
+1. [1단계]: 구체적 액션 (기간, 담당, 방법)
+2. [2단계]: 구체적 액션 (기간, 담당, 방법)
+3. [3단계]: 구체적 액션 (기간, 담당, 방법)
+
+**예상 성과 (숫자로):**
+- 현재 상태: [지표명] = [현재 수치]
+- 목표: [지표명] = [목표 수치] 
+- 증가율: X%
+- 예상 투자: [금액/시간/인력]
+- 예상 ROI: [배수]
+
+### 중요: 사례와 예시는 완전히 분리
+- **사례**: 타 회사가 실제로 한 것 (과거형, 출처 있음)
+- **예시**: 우리가 할 수 있는 것 (현재/미래형, 현재 데이터 기반)`;
+
+                // Groq API 호출
+                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: 'llama-3.3-70b-versatile',
+                        messages: [{
+                            role: 'user',
+                            content: prompt
+                        }],
+                        temperature: 0.7,
+                        max_tokens: 10000
+                    })
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // API 키 오류 - 삭제하고 재입력 요청
+                        localStorage.removeItem('groq_api_key');
+                        throw new Error('유효하지 않은 API 키입니다. 다시 시도해주세요.');
+                    }
+                    if (response.status === 429) {
+                        // 일일 한도 초과
+                        throw new Error('일일 요청 한도를 초과했습니다. 내일 다시 시도해주세요.');
+                    }
+                    throw new Error(`API 오류: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const insight = data.choices[0].message.content;
+
+                // 결과 표시 (마크다운 간단 변환)
+                const formattedInsight = insight
+                    .replace(/#### (.*)/g, '<h5>$1</h5>')
+                    .replace(/### (.*)/g, '<h4>$1</h4>')
+                    .replace(/## (.*)/g, '<h3>$1</h3>')
+                    .replace(/^# .*$/gm, '')  // 단독 # 제거
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\n\n/g, '</p><p>')
+                    .replace(/^(.+)$/gm, '<p>$1</p>')
+                    .replace(/<p><h3>/g, '<h3>')
+                    .replace(/<\/h3><\/p>/g, '</h3>')
+                    .replace(/<p><h4>/g, '<h4>')
+                    .replace(/<\/h4><\/p>/g, '</h4>')
+                    .replace(/<p><h5>/g, '<h5>')
+                    .replace(/<\/h5><\/p>/g, '</h5>')
+                    .replace(/<p>\s*<\/p>/g, '');  // 빈 p 태그 제거
+
+                insightResult.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="color: #667eea; margin: 0;">AI 데이터 인사이트</h3>
+                        <button onclick="resetApiKey()" style="background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em;">API 키 변경</button>
+                    </div>
+                    ${formattedInsight}
+                `;
+
+            } catch (error) {
+                console.error('Insight 생성 오류:', error);
+                insightResult.innerHTML = `
+                    <div style="color: #dc3545; text-align: center; padding: 20px;">
+                        <h3>인사이트 생성 실패</h3>
+                        <p>오류: ${error.message}</p>
+                        <p style="font-size: 0.9em; color: #6c757d; margin-top: 10px;">
+                            Groq API 키를 확인하거나 네트워크 연결을 확인해주세요.
+                        </p>
+                        <button onclick="resetApiKey()" style="background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-top: 15px;">API 키 재설정</button>
+                    </div>
+                `;
+            } finally {
+                // 버튼 복구
+                insightBtn.disabled = false;
+                insightBtn.textContent = 'Insight';
+            }
+        }
+
+        function resetApiKey() {
+            if (confirm('저장된 API 키를 삭제하시겠습니까?')) {
+                localStorage.removeItem('groq_api_key');
+                alert('API 키가 삭제되었습니다. 다음 Insight 생성 시 새로운 키를 입력해주세요.');
+            }
+        }
+
+        // 업로드된 파일 개별 삭제
+        async function removeUploadedFile(fileName) {
+            if (!confirm(`"${fileName}" 파일을 삭제하시겠습니까?\n\n삭제 후 데이터가 재분석됩니다.`)) {
+                return;
+            }
+
+            try {
+                // fileDataMap에서 제거
+                delete fileDataMap[fileName];
+                
+                // uploadedFileNames에서 제거
+                uploadedFileNames = uploadedFileNames.filter(name => name !== fileName);
+                
+                // 남은 파일이 없으면 초기화
+                if (uploadedFileNames.length === 0) {
+                    showToast('⚠️ 모든 파일이 삭제되었습니다. 다시 업로드해주세요.', '#dc3545');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                    return;
+                }
+                
+                // 남은 파일들로 재병합
+                await reprocessFiles();
+                
+                showToast(`✅ "${fileName}" 삭제 완료!`, '#28a745');
+                
+            } catch (error) {
+                console.error('파일 삭제 오류:', error);
+                alert(`❌ 파일 삭제 중 오류가 발생했습니다.\n\n${error.message}`);
+            }
+        }
+
+        // 파일 추가
+        function addMoreFiles() {
+            // 파일 선택 다이얼로그 열기
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.accept = '.csv,.xlsx,.xls';
+            
+            input.onchange = async (e) => {
+                const newFiles = Array.from(e.target.files);
+                
+                if (newFiles.length === 0) return;
+                
+                try {
+                    // 중복 파일명 체크
+                    for (const file of newFiles) {
+                        if (uploadedFileNames.includes(file.name)) {
+                            throw new Error(`"${file.name}"은(는) 이미 업로드된 파일입니다.`);
+                        }
+                    }
+                    
+                    // 새 파일 읽기 및 처리
+                    for (const file of newFiles) {
+                        const fileName = file.name.toLowerCase();
+                        let fileData = [];
+                        
+                        if (fileName.endsWith('.csv')) {
+                            // CSV 파일 처리
+                            fileData = await new Promise((resolve, reject) => {
+                                Papa.parse(file, {
+                                    header: true,
+                                    complete: (results) => {
+                                        const cleanData = results.data.filter(row => Object.values(row).some(val => val !== ''));
+                                        resolve(cleanData);
+                                    },
+                                    error: (error) => reject(error)
+                                });
+                            });
+                        } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+                            // Excel 파일 처리
+                            fileData = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    try {
+                                        const data = new Uint8Array(e.target.result);
+                                        const workbook = XLSX.read(data, { type: 'array' });
+                                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                                        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                                        resolve(jsonData);
+                                    } catch (error) {
+                                        reject(error);
+                                    }
+                                };
+                                reader.onerror = () => reject(new Error('파일 읽기 실패'));
+                                reader.readAsArrayBuffer(file);
+                            });
+                        }
+                        
+                        // 빈 데이터 체크
+                        if (fileData.length === 0) {
+                            throw new Error(`${file.name}에 데이터가 없습니다.`);
+                        }
+                        
+                        // 헤더 일치 확인
+                        const newHeaders = Object.keys(fileData[0]);
+                        const existingHeaders = headers;
+                        
+                        const headersMatch = existingHeaders.length === newHeaders.length && 
+                                           existingHeaders.every(h => newHeaders.includes(h));
+                        
+                        if (!headersMatch) {
+                            throw new Error(`❌ 파일 구조 불일치!\n\n기존 파일과 ${file.name}의 컬럼이 다릅니다.\n모든 파일의 컬럼 구조가 동일해야 합니다.`);
+                        }
+                        
+                        // fileDataMap에 추가
+                        fileDataMap[file.name] = {
+                            data: fileData,
+                            rowCount: fileData.length
+                        };
+                        
+                        uploadedFileNames.push(file.name);
+                    }
+                    
+                    // 재병합
+                    await reprocessFiles();
+                    
+                    showToast(`✅ ${newFiles.length}개 파일 추가 완료!`, '#28a745');
+                    
+                } catch (error) {
+                    console.error('파일 추가 오류:', error);
+                    alert(`❌ 파일 추가 중 오류가 발생했습니다.\n\n${error.message}`);
+                }
+            };
+            
+            input.click();
+        }
+
+        // 파일 재병합 (삭제/추가 후)
+        async function reprocessFiles() {
+            // 모든 파일 데이터를 다시 병합
+            let allData = [];
+            
+            for (const fileName of uploadedFileNames) {
+                const fileInfo = fileDataMap[fileName];
+                if (fileInfo && fileInfo.data) {
+                    allData = allData.concat(fileInfo.data);
+                }
+            }
+            
+            // 일시 컬럼에서 시간 정보 제거
+            rawData = processDateColumns(allData);
+            headers = Object.keys(rawData[0] || {});
+            
+            // 🔥 중요: filteredData도 업데이트!
+            filteredData = [...rawData];
+            
+            // UI 업데이트
+            const uploadSection = document.getElementById('uploadSection');
+            uploadSection.innerHTML = `
+                <div class="upload-icon">✅</div>
+                <h2 style="color: #28a745;">파일 병합 완료!</h2>
+                <p style="margin: 15px 0; color: #6c757d;">
+                    ${uploadedFileNames.length}개 파일 병합 완료<br>
+                    총 ${rawData.length.toLocaleString()}개 행, ${headers.length}개 컬럼
+                </p>
+                <div class="uploaded-files-info">
+                    <h4 style="margin-bottom: 15px;">📂 업로드된 파일</h4>
+                    <div id="uploadedFilesList" class="uploaded-files-list">
+                        ${uploadedFileNames.map(name => {
+                            const fileInfo = fileDataMap[name];
+                            return `
+                                <div class="uploaded-file-item">
+                                    <div class="uploaded-file-item-info">
+                                        <span class="uploaded-file-name">📄 ${name}</span>
+                                        <span class="uploaded-file-rows">${fileInfo.rowCount.toLocaleString()}개 행</span>
+                                    </div>
+                                    <button onclick="removeUploadedFile('${name.replace(/'/g, "\\'")}')" class="uploaded-file-remove-btn">삭제</button>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                <button onclick="addMoreFiles()" class="add-more-files-btn">➕ 파일 추가하기</button>
+            `;
+            
+            // 피벗 테이블 재생성
+            if (pivotConfig.rows.length > 0 || pivotConfig.columns.length > 0 || pivotConfig.values.length > 0) {
+                generatePivotTable();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MGT_Analytics Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            overflow: hidden;
+        }
+
+        .dashboard-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* LNB - Left Navigation Bar */
+        .lnb {
+            width: 260px;
+            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+            box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 100;
+        }
+
+        /* Logo Section */
+        .logo-section {
+            padding: 30px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .logo-section h1 {
+            color: #F5F5DC;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .logo-section p {
+            color: rgba(245, 245, 220, 0.7);
+            font-size: 12px;
+            margin-left: 42px;
+        }
+
+        /* Navigation Menu */
+        .nav-menu {
+            flex: 1;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            padding: 16px 20px;
+            color: rgba(245, 245, 220, 0.8);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            user-select: none;
+        }
+
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #F5F5DC;
+        }
+
+        .nav-item.active {
+            background: rgba(66, 153, 225, 0.15);
+            border-left-color: #4299e1;
+            color: #63b3ed;
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            height: 70px;
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .page-title h2 {
+            color: #2d3748;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .page-icon {
+            font-size: 28px;
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            padding: 10px 40px 10px 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 20px;
+            width: 240px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #4299e1;
+            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            pointer-events: none;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            background: #f9fafb;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .user-profile:hover {
+            background: #f3f4f6;
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .user-name {
+            color: #2d3748;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Content Frame */
+        .content-frame {
+            flex: 1;
+            padding: 20px;
+            overflow: hidden;
+            background: #f9fafb;
+        }
+
+        iframe, .content-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Loading Spinner */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f4f6;
+            border-top-color: #4299e1;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Welcome Screen */
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .welcome-icon {
+            font-size: 80px;
+            margin-bottom: 30px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .welcome-screen h2 {
+            color: #2d3748;
+            font-size: 36px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .welcome-screen p {
+            color: #718096;
+            font-size: 18px;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        /* Scrollbar Styling */
+        .nav-menu::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .nav-menu::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-menu::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .nav-menu::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .lnb {
+                width: 200px;
+            }
+
+            .search-box input {
+                width: 160px;
+            }
+
+            .user-name {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Left Navigation Bar -->
+        <aside class="lnb">
+            <div class="logo-section">
+                <h1>
+                    <span class="logo-icon">📊</span>
+                    <span>MGT Analytics</span>
+                </h1>
+                <p>Data Insights Hub</p>
+            </div>
+
+            <nav class="nav-menu">
+                <div class="nav-item active" data-page="pivot" data-title="매출 데이터 분석" data-icon="📈">
+                    <span class="nav-icon">📈</span>
+                    <span>매출 데이터 분석</span>
+                </div>
+                <div class="nav-item" data-page="retention" data-title="리텐션 분석" data-icon="👥">
+                    <span class="nav-icon">👥</span>
+                    <span>리텐션 분석</span>
+                </div>
+                <div class="nav-item" data-page="image" data-title="이미지 메타 분석" data-icon="🖼️">
+                    <span class="nav-icon">🖼️</span>
+                    <span>이미지 메타 분석</span>
+                </div>
+                <div class="nav-item" data-page="pattern" data-title="메타데이터 패턴 분석" data-icon="📊">
+                    <span class="nav-icon">📊</span>
+                    <span>메타데이터 패턴 분석</span>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="page-title">
+                    <span class="page-icon">📈</span>
+                    <h2 id="currentPageTitle">매출 데이터 분석</h2>
+                </div>
+                <div class="top-bar-right">
+                    <div class="search-box">
+                        <input type="text" placeholder="Search...">
+                        <span class="search-icon">🔍</span>
+                    </div>
+                    <div class="user-profile">
+                        <div class="user-avatar">우</div>
+                        <span class="user-name">우엉</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Frame -->
+            <div class="content-frame">
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="spinner"></div>
+                </div>
+                
+                <div class="welcome-screen" id="welcomeScreen" style="display: none;">
+                    <div class="welcome-icon">📊</div>
+                    <h2>MGT Analytics Hub에 오신 것을 환영합니다</h2>
+                    <p>좌측 메뉴에서 원하시는 분석 도구를 선택해주세요.<br>
+                    데이터 기반의 인사이트를 제공해드립니다.</p>
+                </div>
+
+                <!-- 모든 iframe을 미리 생성하여 상태 유지 -->
+                <iframe id="frame-pivot" class="content-iframe" src="./tools/revenue_analytics.html" style="display: block;"></iframe>
+                <iframe id="frame-retention" class="content-iframe" src="" style="display: none;"></iframe>
+                <iframe id="frame-image" class="content-iframe" src="" style="display: none;"></iframe>
+                <iframe id="frame-pattern" class="content-iframe" src="" style="display: none;"></iframe>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 페이지 매핑
+        const pageMap = {
+            'pivot': './tools/revenue_analytics.html',
+            'retention': './tools/paying_retention_analytics.html',
+            'image': './tools/contents_metadata_analytics.html',
+            'pattern': './tools/metadata_pattern_analytics.html'
+        };
+
+        // iframe 로드 상태 추적
+        const loadedFrames = {
+            'pivot': true, // 초기 로드
+            'retention': false,
+            'image': false,
+            'pattern': false
+        };
+
+        const navItems = document.querySelectorAll('.nav-item');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const pageTitle = document.getElementById('currentPageTitle');
+        const pageIcon = document.querySelector('.page-icon');
+        const allFrames = {
+            'pivot': document.getElementById('frame-pivot'),
+            'retention': document.getElementById('frame-retention'),
+            'image': document.getElementById('frame-image'),
+            'pattern': document.getElementById('frame-pattern')
+        };
+
+        // 네비게이션 클릭 이벤트
+        navItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // 활성 상태 변경
+                navItems.forEach(nav => nav.classList.remove('active'));
+                this.classList.add('active');
+
+                // 페이지 로드
+                const page = this.dataset.page;
+                const title = this.dataset.title;
+                const icon = this.dataset.icon;
+
+                loadPage(page, title, icon);
+            });
+        });
+
+        function loadPage(page, title, icon) {
+            // 타이틀 업데이트
+            pageTitle.textContent = title;
+            pageIcon.textContent = icon;
+
+            const targetFrame = allFrames[page];
+
+            // 이미 로드된 프레임인 경우 즉시 전환
+            if (loadedFrames[page]) {
+                switchFrames(page);
+            } else {
+                // 처음 로드하는 경우
+                loadingOverlay.classList.add('active');
+                
+                targetFrame.src = pageMap[page];
+                
+                targetFrame.onload = function() {
+                    loadedFrames[page] = true;
+                    switchFrames(page);
+                    setTimeout(() => {
+                        loadingOverlay.classList.remove('active');
+                    }, 300);
+                };
+
+                targetFrame.onerror = function() {
+                    loadingOverlay.classList.remove('active');
+                    alert('페이지를 불러올 수 없습니다.');
+                };
+            }
+        }
+
+        function switchFrames(activePage) {
+            // 모든 iframe 숨기기
+            Object.keys(allFrames).forEach(key => {
+                allFrames[key].style.display = 'none';
+            });
+            
+            // 선택한 iframe만 표시
+            allFrames[activePage].style.display = 'block';
+        }
+    </script>
+</body>
+</html>

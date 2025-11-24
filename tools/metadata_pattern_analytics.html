@@ -1048,9 +1048,14 @@
             <div class="file-management-section" id="fileManagementSection" style="display: none;">
                 <div class="file-management-header">
                     <h3>📂 업로드된 파일 관리</h3>
-                    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="font-size: 0.9em; padding: 8px 20px;">
-                        ➕ 파일 추가
-                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" id="mergeFilesBtn" onclick="mergeFiles()" style="font-size: 0.9em; padding: 8px 20px; display: none;">
+                            🔗 파일 병합
+                        </button>
+                        <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()" style="font-size: 0.9em; padding: 8px 20px;">
+                            ➕ 파일 추가
+                        </button>
+                    </div>
                 </div>
                 <div class="file-list" id="fileList"></div>
             </div>
@@ -1117,6 +1122,8 @@
         let geminiApiKey = localStorage.getItem('geminiApiKey') || '';
         let uploadedFiles = []; // 업로드된 파일 목록
         let currentFileIndex = 0; // 현재 분석 중인 파일 인덱스
+        let isMerged = false; // 파일 병합 여부
+        let uploadedFileNames = []; // 병합된 파일명들
         
         // AI 분석 결과 저장소 (탭 전환해도 유지)
         let aiAnalysisCache = {
@@ -1390,27 +1397,45 @@
                 const fileItem = document.createElement('div');
                 fileItem.className = `file-item ${isActive ? 'active' : ''}`;
                 
+                // 병합된 파일인 경우 특별 표시
+                const displayName = file.isMerged ? 
+                    `🔗 ${file.name}` : 
+                    file.name;
+                
+                const metaInfo = file.isMerged ?
+                    `<span>📦 ${file.rowCount}행 × ${file.columnCount}열</span>
+                     <span>📁 ${file.originalFiles.join(', ')}</span>` :
+                    `<span>📦 ${file.rowCount}행 × ${file.columnCount}열</span>
+                     <span>📅 ${file.uploadTime}</span>
+                     <span>💾 ${formatFileSize(file.size)}</span>`;
+                
                 fileItem.innerHTML = `
                     <div class="file-info">
-                        <div class="file-icon">📊</div>
+                        <div class="file-icon">${file.isMerged ? '🔗' : '📊'}</div>
                         <div class="file-details">
-                            <div class="file-name">${file.name}</div>
+                            <div class="file-name">${displayName}</div>
                             <div class="file-meta">
-                                <span>📦 ${file.rowCount}행 × ${file.columnCount}열</span>
-                                <span>📅 ${file.uploadTime}</span>
-                                <span>💾 ${formatFileSize(file.size)}</span>
+                                ${metaInfo}
                             </div>
                         </div>
                         ${isActive ? '<span class="file-status-badge">분석 중</span>' : ''}
                     </div>
                     <div class="file-actions">
-                        ${!isActive ? `<button class="file-btn file-btn-select" onclick="selectFile(${index})">선택</button>` : ''}
-                        <button class="file-btn file-btn-delete" onclick="deleteFile(${index})">삭제</button>
+                        ${!isActive && !file.isMerged ? `<button class="file-btn file-btn-select" onclick="selectFile(${index})">선택</button>` : ''}
+                        ${!file.isMerged ? `<button class="file-btn file-btn-delete" onclick="deleteFile(${index})">삭제</button>` : ''}
                     </div>
                 `;
                 
                 fileListDiv.appendChild(fileItem);
             });
+            
+            // 병합 버튼 표시 여부 결정 (2개 이상 파일 있고, 병합 안 된 상태)
+            const mergeBtn = document.getElementById('mergeFilesBtn');
+            if (uploadedFiles.length >= 2 && !isMerged) {
+                mergeBtn.style.display = 'block';
+            } else {
+                mergeBtn.style.display = 'none';
+            }
         }
 
         // 파일 크기 포맷팅
@@ -1483,6 +1508,64 @@
                 }
                 
                 updateFileList();
+            }
+        }
+
+        // 파일 병합
+        function mergeFiles() {
+            if (uploadedFiles.length < 2) {
+                alert('병합하려면 최소 2개 이상의 파일이 필요합니다.');
+                return;
+            }
+            
+            if (!confirm(`${uploadedFiles.length}개의 파일을 병합하시겠습니까?\n\n병합 후에는 전체 데이터를 하나로 분석합니다.`)) {
+                return;
+            }
+            
+            try {
+                // 모든 파일의 데이터를 병합
+                let mergedData = [];
+                uploadedFileNames = [];
+                
+                uploadedFiles.forEach(file => {
+                    mergedData = mergedData.concat(file.data);
+                    uploadedFileNames.push(file.name);
+                });
+                
+                // 병합된 데이터로 설정
+                currentData = mergedData;
+                isMerged = true;
+                
+                // 병합된 파일 정보 생성
+                const mergedFileInfo = {
+                    name: `병합됨 (${uploadedFiles.length}개 파일)`,
+                    size: uploadedFiles.reduce((sum, f) => sum + f.size, 0),
+                    uploadTime: new Date().toLocaleString('ko-KR'),
+                    data: mergedData,
+                    rowCount: mergedData.length,
+                    columnCount: Object.keys(mergedData[0] || {}).length,
+                    isMerged: true,
+                    originalFiles: uploadedFileNames
+                };
+                
+                // 파일 목록을 병합된 파일 하나로 대체
+                uploadedFiles = [mergedFileInfo];
+                currentFileIndex = 0;
+                
+                // UI 업데이트
+                updateFileList();
+                displayDataPreview(currentData);
+                
+                // 분석 초기화
+                document.getElementById('analysisTabs').style.display = 'flex';
+                showAnalysis('frequency');
+                
+                // 성공 메시지
+                alert(`✅ 파일 병합 완료!\n\n병합된 파일: ${uploadedFileNames.length}개\n총 데이터: ${mergedData.length.toLocaleString()}개 행\n컬럼: ${Object.keys(mergedData[0] || {}).length}개`);
+                
+            } catch (error) {
+                alert('파일 병합 중 오류가 발생했습니다: ' + error.message);
+                console.error('Merge error:', error);
             }
         }
 

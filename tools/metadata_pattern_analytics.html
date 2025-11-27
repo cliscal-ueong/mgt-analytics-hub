@@ -1755,10 +1755,10 @@
 #### 발견 1: 제목
 - **왜 중요한가요?**
   - 상위 10개 중 70%가 캐릭터 기반입니다 (공백 2개!)
-  - 70%가 귀여운 성격을 가지며 80%가 정적 콘텐츠입니다 (공백 2개!)
+  - 70%가 귀여운 성격을 가집니다 (공백 2개!)
 - **어떻게 활용하나요?**
   - 캐릭터를 전면에 배치하세요 (공백 2개!)
-  - 정적 콘텐츠로 안정감을 주세요 (공백 2개!)
+  - 따뜻한 색상으로 친근감을 주세요 (공백 2개!)
 
 **톤 & 스타일:**
 - 20~30대 크리에이터 타겟
@@ -1771,6 +1771,12 @@
 2. 하위 항목은 정확히 공백 2개로 들여쓰기
 3. 요청한 개수만큼 정확히 작성 (TOP 3이면 3개, TOP 5면 5개)
 4. 각 항목마다 구체적인 숫자와 예시 포함
+5. **절대 언급 금지 항목 (어떤 형태로든 언급하지 마세요!):**
+   - 라인 스타일 (선의 굵기, 얇은선, 굵은선 등)
+   - 콘텐츠 행동성 (정적, 동적, 움직임의 많고 적음 등)
+   - 표현 감정 강도 (강함, 보통, 약함 등)
+6. 기능 기반 사용처(블로그, SNS)에 대한 불확실한 추측 금지 (예: "블로그에서 로딩 길어진다" 같은 것)
+7. 100% 확실하지 않은 정보는 절대 쓰지 마세요
 `;
 
         // ===== 개선된 AI 분석 함수들 (통일된 구조) =====
@@ -1784,7 +1790,8 @@
             
             // 데이터 준비
             const columns = Object.keys(currentData[0]).filter(col => 
-                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명') &&
+                col !== '라인 스타일' && col !== '콘텐츠 행동성' && col !== '표현 감정 강도'
             );
             
             let analysisData = '## 분석 데이터\n\n';
@@ -1902,7 +1909,8 @@ ${UNIFIED_PROMPT_STRUCTURE}
             
             // 데이터 준비
             const columns = Object.keys(currentData[0]).filter(col => 
-                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명') &&
+                col !== '라인 스타일' && col !== '콘텐츠 행동성' && col !== '표현 감정 강도'
             );
             const combinations = findTopCombinations(columns, 2);
             
@@ -2173,7 +2181,8 @@ ${analysisData}
             btn.innerHTML = '<span class="loading-spinner"></span>분석 중...';
             
             const columns = Object.keys(currentData[0]).filter(col => 
-                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명') &&
+                col !== '라인 스타일' && col !== '콘텐츠 행동성' && col !== '표현 감정 강도'
             );
             
             let analysisData = '## 메타데이터 다양성 분석\n\n';
@@ -2942,7 +2951,8 @@ ${analysisData}
 
         function calculateAssociationRules() {
             const columns = Object.keys(currentData[0]).filter(col => 
-                !col.includes('순위') && !col.includes('ID') && !col.includes('명')
+                !col.includes('순위') && !col.includes('ID') && !col.includes('명') &&
+                col !== '라인 스타일' && col !== '콘텐츠 행동성' && col !== '표현 감정 강도'
             ).slice(0, 5);
 
             const rules = [];
@@ -3586,6 +3596,21 @@ ${analysisData}
                     return;
                 }
 
+                // 플랫폼 선택
+                const platform = prompt('플레이북을 생성할 플랫폼을 선택하세요:\n\n1. Naver OGQ마켓\n2. SOOP OGQ마켓\n3. CH+ OGQ마켓\n\n번호를 입력해주세요 (1, 2, 3):');
+                
+                let selectedPlatform = '';
+                if (platform === '1') {
+                    selectedPlatform = 'Naver OGQ마켓';
+                } else if (platform === '2') {
+                    selectedPlatform = 'SOOP OGQ마켓';
+                } else if (platform === '3') {
+                    selectedPlatform = 'CH+ OGQ마켓';
+                } else {
+                    alert('올바른 번호를 입력해주세요.');
+                    return;
+                }
+
                 // 로딩 시작
                 const originalBtn = event.target;
                 const originalText = originalBtn.textContent;
@@ -3605,7 +3630,7 @@ ${analysisData}
                 const visualText = extractTextFromHTML(hasVisual);
 
                 // Gemini에게 통합 요약 요청
-                const prompt = `# 초압축 플레이북 생성 미션 🎯
+                const promptTemplate = `# 초압축 플레이북 생성 미션 🎯
 
 우리가 4가지 분석을 다 돌렸어요. 이제 이걸 **실전에서 바로 쓸 수 있는 초간결 플레이북**으로 만들어주세요!
 
@@ -3668,22 +3693,22 @@ ${visualText.slice(0, 2500)}
 #### 3. [액션 제목]
 (동일 구조 - 실행 가능할 정도로 구체적으로!)
 
-### ⚠️ 절대 금지 3가지
-- 실패 패턴 1: [제목]
-  - 왜 피해야 할까? (데이터 근거, 1~2줄!)
+### ⚠️ 피하면 좋은 패턴 3가지
+- 주의할 패턴 1: [제목]
+  - 왜 주의해야 할까? (데이터 근거, 1~2줄!)
   - 대신 이렇게 (구체적 대안, 1~2줄!)
   - 실전 팁 (1줄!)
-- 실패 패턴 2: [제목]
-  - 왜 피해야 할까?
+- 주의할 패턴 2: [제목]
+  - 왜 주의해야 할까?
   - 대신 이렇게
   - 실전 팁
-- 실패 패턴 3: [제목]
-  - 왜 피해야 할까?
+- 주의할 패턴 3: [제목]
+  - 왜 주의해야 할까?
   - 대신 이렇게
   - 실전 팁
 
-### 💎 성공 공식
-데이터로 검증된 황금 조합을 **4~5줄**로 정리
+### 💎 효과적인 조합 패턴
+데이터로 검증된 조합을 **4~5줄**로 정리
 - 핵심 조합 패턴
 - 왜 효과적인가
 - 실제 적용 방법
@@ -3709,11 +3734,15 @@ ${visualText.slice(0, 2500)}
 7. **타 서비스 이름 절대 금지!** (핀터레스트, 인스타그램 등)
 8. "자신의 작품 만들기" 관점 유지 - 표절 아닌 창작!
 9. 간결하되 실행 가능할 정도로 상세하게!
+10. **100% 확실하지 않은 정보는 절대 쓰지 마세요!** 추측이나 불확실한 내용 금지!
+11. **절대 언급 금지 항목:** 라인 스타일(선 굵기), 콘텐츠 행동성(움직임 정도), 표현 감정 강도 - 이 3가지는 어떤 형태로든 절대 언급하지 마세요!
+12. 기능 기반 사용처(블로그, SNS)에 대한 불확실한 추측 금지 (예: "블로그에서 로딩 길어진다" 같은 것)
+13. 사용자의 창의성을 제한하는 표현 사용 금지
 
 지금 바로 쓸 수 있게, 깔끔하게, 친근하게, 그리고 충분히 구체적으로 작성해주세요! 🎉`;
 
                 // Gemini API 호출
-                const playbookResult = await callGeminiAPI(prompt);
+                const playbookResult = await callGeminiAPI(promptTemplate);
 
                 if (!playbookResult) {
                     throw new Error('플레이북 생성 실패');
@@ -3743,14 +3772,14 @@ ${visualText.slice(0, 2500)}
                     <div style="text-align: center; margin-top: 120px;">
                         <div style="font-size: 72px; margin-bottom: 40px;">🔥</div>
                         <h1 style="font-size: 48px; margin-bottom: 30px; font-weight: 700; color: white;">
-                            성공 플레이북
+                            효과적인 조합 플레이북
                         </h1>
                         <div style="font-size: 28px; margin-bottom: 80px; opacity: 0.95; color: white;">
                             데이터가 알려주는 정답
                         </div>
                         <div style="width: 80%; height: 3px; background: rgba(255,255,255,0.5); margin: 80px auto;"></div>
-                        <div style="font-size: 20px; opacity: 0.9; margin-bottom: 15px; color: white;">
-                            📊 ${fileName}
+                        <div style="font-size: 24px; opacity: 0.9; margin-bottom: 15px; color: white; font-weight: 600;">
+                            🎯 ${selectedPlatform}
                         </div>
                         <div style="font-size: 18px; opacity: 0.9; color: white;">
                             📅 ${today}
@@ -3866,13 +3895,13 @@ ${visualText.slice(0, 2500)}
 
                 // PDF 저장
                 const timestamp = new Date().toISOString().slice(0, 10);
-                doc.save(`성공_플레이북_${timestamp}.pdf`);
+                doc.save(`${selectedPlatform}_플레이북_${timestamp}.pdf`);
                 
                 // 버튼 복원
                 originalBtn.disabled = false;
                 originalBtn.textContent = originalText;
                 
-                alert('🔥 플레이북 완성!\n\n커버 포함 3.5~4페이지로 실행 가능한 디테일까지 담았어요.\n지금 바로 써먹을 수 있는 실전 가이드입니다!');
+                alert(`🔥 플레이북 완성!\n\n${selectedPlatform} 맞춤 플레이북이 생성되었습니다.\n커버 포함 3.5~4페이지로 실행 가능한 디테일까지 담았어요.\n지금 바로 써먹을 수 있는 실전 가이드입니다!`);
 
             } catch (error) {
                 console.error('플레이북 생성 오류:', error);

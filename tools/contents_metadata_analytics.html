@@ -37,6 +37,7 @@
             color: #422006;
             padding: 30px;
             text-align: center;
+            position: relative;
         }
         
         .header h1 {
@@ -47,6 +48,84 @@
         .header p {
             opacity: 0.9;
             font-size: 14px;
+        }
+
+        .api-settings-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 2px solid rgba(66, 32, 6, 0.3);
+            color: #422006;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .api-settings-btn:hover {
+            background: rgba(255, 255, 255, 0.5);
+            border-color: rgba(66, 32, 6, 0.5);
+        }
+
+        .api-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .api-status.connected {
+            background: #22c55e;
+        }
+
+        .api-status.disconnected {
+            background: #ef4444;
+        }
+
+        /* 모달 스타일 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: 700;
+            color: #422006;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
         }
         
         /* 2단 레이아웃 */
@@ -764,6 +843,7 @@
                 subCategories: [
                     { name: "콘텐츠 도메인", options: ["일러스트", "캐릭터", "동물", "사람", "수채화", "풍경", "실사", "아이콘/심볼", "텍스트/타이포", "추상/패턴", "없음", "기타"] },
                     { name: "콘텐츠 도메인 상세", options: ["영유아", "어린이", "청소년", "청년", "중년", "노년", "남성", "여성", "그룹", "커플", "가족", "친구", "강아지", "고양이", "새", "물고기", "곰", "토끼", "야생동물", "애완동물", "전자기기", "가구", "의류", "차량", "산", "바다", "숲", "하늘", "일출", "일몰", "없음", "기타"], hasToggle: true },
+                    { name: "콘텐츠 크기", options: ["미니형", "성인형", "불명", "없음", "기타"] },
                     { name: "콘텐츠 성격", options: ["행복한", "즐거운", "평온한", "차분한", "귀여움", "고요한", "활기찬", "역동적인", "에너지넘치는", "몽환적인", "신비로운", "따뜻한", "아늑한", "포근한", "차가운", "시원한", "청량한", "우울한", "슬픈", "감성적인", "낭만적인", "극적인", "긴장감있는", "편안한", "자연스러운", "없음", "기타"], hasToggle: true },
                     { name: "콘텐츠 행동성", options: ["정적", "동작 많음", "없음", "기타"] },
                     { name: "콘텐츠 색상 스타일", options: ["파스텔톤", "흑백", "비비드톤", "단색위주", "없음", "기타"] }
@@ -793,6 +873,7 @@
             const [apiKey, setApiKey] = React.useState(() => localStorage.getItem('gemini_api_key') || '');
             const [apiKeyInput, setApiKeyInput] = React.useState(apiKey);
             const [apiKeySet, setApiKeySet] = React.useState(!!apiKey);
+            const [showApiModal, setShowApiModal] = React.useState(false);
             
             const [images, setImages] = React.useState([]);
             const [selectedIndex, setSelectedIndex] = React.useState(null);
@@ -826,6 +907,7 @@
                 localStorage.setItem('gemini_api_key', apiKeyInput);
                 setApiKey(apiKeyInput);
                 setApiKeySet(true);
+                setShowApiModal(false);
                 setError(null);
             };
             
@@ -922,6 +1004,7 @@ ${categoryList}
   },
   "② 콘텐츠 속성": {
     "콘텐츠 도메인": "선택된 값",
+    "콘텐츠 크기": "선택된 값",
     "콘텐츠 성격": "선택된 값",
     "콘텐츠 행동성": "선택된 값",
     "콘텐츠 색상 스타일": "선택된 값"
@@ -1131,43 +1214,45 @@ IMPORTANT: JSON 형식만 출력하세요 (마크다운 코드블록 없이)`;
             return (
                 <div className="container">
                     <div className="header">
+                        <button 
+                            className="api-settings-btn"
+                            onClick={() => setShowApiModal(true)}
+                        >
+                            <span className={`api-status ${apiKeySet ? 'connected' : 'disconnected'}`}></span>
+                            API 설정
+                        </button>
                         <h1>🎨 Meta Data Analysis</h1>
                         <p>여러 이미지를 한번에 업로드하고 AI가 자동으로 메타데이터를 분석합니다</p>
                     </div>
 
-                    {!apiKeySet ? (
-                        <div style={{padding: '30px'}}>
-                            <div className="api-key-setup">
-                                <h3>
-                                    🤖 AI 분석 연동
-                                    <div className="tooltip-container">
-                                        ?
-                                        <div className="tooltip-text">
-                                            <strong>💡 API 키 발급 방법:</strong><br/>
-                                            1. <a href="https://aistudio.google.com/app/apikey" target="_blank">해당 페이지</a>에 방문<br/>
-                                            2. "Get API Key" → "Create new API key" 클릭<br/>
-                                            3. API 키 복사 후 붙여넣기<br/><br/>
-                                            🔒 API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다.
-                                        </div>
-                                    </div>
-                                </h3>
-                                <div className="api-key-input-group">
-                                    <input 
-                                        type="password"
-                                        className="api-key-input"
-                                        value={apiKeyInput}
-                                        onChange={(e) => setApiKeyInput(e.target.value)}
-                                        placeholder="Google Gemini API 키를 입력하세요"
-                                        onKeyPress={(e) => e.key === 'Enter' && saveApiKey()}
-                                    />
-                                    <button className="btn-set-key" onClick={saveApiKey}>설정</button>
-                                </div>
+                    {!apiKeySet && (
+                        <div style={{
+                            background: '#fef3c7',
+                            border: '2px solid #f59e0b',
+                            borderRadius: '12px',
+                            padding: '20px',
+                            margin: '20px',
+                            textAlign: 'center'
+                        }}>
+                            <div style={{ fontSize: '16px', fontWeight: '600', color: '#92400e', marginBottom: '8px' }}>
+                                ⚠️ API 키가 설정되지 않았습니다
                             </div>
+                            <div style={{ fontSize: '14px', color: '#78350f', marginBottom: '12px' }}>
+                                AI 분석을 사용하려면 상단의 'API 설정' 버튼을 클릭하세요
+                            </div>
+                            <button 
+                                className="btn-set-key"
+                                onClick={() => setShowApiModal(true)}
+                                style={{ margin: '0 auto' }}
+                            >
+                                API 설정하기
+                            </button>
                         </div>
-                    ) : (
-                        <div className="main-layout">
-                            <div className="sidebar">
-                                <h3>📁 이미지 목록 ({images.length}개)</h3>
+                    )}
+
+                    <div className="main-layout">
+                        <div className="sidebar">
+                            <h3>📁 이미지 목록 ({images.length}개)</h3>
                                 <button 
                                     className="multi-upload-btn"
                                     onClick={() => multiFileInputRef.current?.click()}
@@ -1395,6 +1480,72 @@ IMPORTANT: JSON 형식만 출력하세요 (마크다운 코드블록 없이)`;
                                         )}
                                     </>
                                 )}
+                            </div>
+                        </div>
+
+                    {/* API 설정 모달 */}
+                    {showApiModal && (
+                        <div className="modal-overlay" onClick={() => setShowApiModal(false)}>
+                            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                <div className="api-key-setup">
+                                    <h3>
+                                        🤖 AI 분석 연동
+                                        <div className="tooltip-container">
+                                            ?
+                                            <div className="tooltip-text">
+                                                <strong>💡 API 키 발급 방법:</strong><br/>
+                                                1. <a href="https://aistudio.google.com/app/apikey" target="_blank">해당 페이지</a>에 방문<br/>
+                                                2. "Get API Key" → "Create new API key" 클릭<br/>
+                                                3. API 키 복사 후 붙여넣기<br/><br/>
+                                                🔒 API 키는 브라우저에만 저장되며 외부로 전송되지 않습니다.
+                                            </div>
+                                        </div>
+                                    </h3>
+                                    
+                                    {apiKeySet && (
+                                        <div style={{
+                                            background: '#f0fdf4',
+                                            border: '1px solid #86efac',
+                                            borderRadius: '8px',
+                                            padding: '12px',
+                                            marginBottom: '15px',
+                                            color: '#166534',
+                                            fontSize: '14px'
+                                        }}>
+                                            ✅ API 연결됨 - 새 키를 입력하면 기존 키가 교체됩니다
+                                        </div>
+                                    )}
+
+                                    <div className="api-key-input-group">
+                                        <input 
+                                            type="password"
+                                            className="api-key-input"
+                                            value={apiKeyInput}
+                                            onChange={(e) => setApiKeyInput(e.target.value)}
+                                            placeholder="Google Gemini API 키를 입력하세요"
+                                            onKeyPress={(e) => e.key === 'Enter' && saveApiKey()}
+                                        />
+                                        <button className="btn-set-key" onClick={saveApiKey}>
+                                            {apiKeySet ? '변경' : '설정'}
+                                        </button>
+                                    </div>
+
+                                    <button 
+                                        style={{
+                                            width: '100%',
+                                            marginTop: '15px',
+                                            background: '#f3f4f6',
+                                            border: '1px solid #d1d5db',
+                                            padding: '10px',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px'
+                                        }}
+                                        onClick={() => setShowApiModal(false)}
+                                    >
+                                        닫기
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}

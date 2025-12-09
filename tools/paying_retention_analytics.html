@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://apis.google.com/js/api.js" defer></script>
     <style>
         * {
             margin: 0;
@@ -1475,7 +1475,7 @@
             if (result.cohort_analysis) {
                 createCohortHeatmap('dailyCohortTable', result.cohort_analysis.daily, ['D+1', 'D+2', 'D+3', 'D+7', 'D+14', 'D+30']);
                 createCohortHeatmap('weeklyCohortTable', result.cohort_analysis.weekly, ['W+1', 'W+2', 'W+3', 'W+4']);
-                createCohortHeatmap('monthlyCohortTable', result.cohort_analysis.monthly, ['M+1', 'M+2', 'M+3']);
+                createCohortHeatmap('monthlyCohortTable', result.cohort_analysis.monthly, null); // 자동으로 전체 범위 계산
             }
             
             // 차트 타입 버튼 상태 업데이트
@@ -1732,6 +1732,23 @@
 
         function createCohortHeatmap(tableId, cohortData, periods) {
             const table = document.getElementById(tableId);
+            
+            // periods가 제공되지 않으면 데이터에서 자동으로 계산
+            if (!periods || periods.length === 0) {
+                const allPeriods = new Set();
+                Object.values(cohortData).forEach(data => {
+                    Object.keys(data.retention || {}).forEach(period => {
+                        allPeriods.add(period);
+                    });
+                });
+                
+                // 기간을 숫자 순서대로 정렬 (M+1, M+2, ... M+10)
+                periods = Array.from(allPeriods).sort((a, b) => {
+                    const numA = parseInt(a.match(/\d+/)[0]);
+                    const numB = parseInt(b.match(/\d+/)[0]);
+                    return numA - numB;
+                });
+            }
             
             // 헤더 생성
             let html = '<thead><tr><th>코호트</th><th>인원</th>';
@@ -2085,29 +2102,54 @@
 
         // Google API 초기화
         function gapiLoaded() {
-            gapi.load('client', initializeGapiClient);
+            if (typeof gapi !== 'undefined') {
+                gapi.load('client', initializeGapiClient);
+            }
         }
 
         async function initializeGapiClient() {
-            await gapi.client.init({
-                discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
-            });
-            gapiInited = true;
+            try {
+                await gapi.client.init({
+                    discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
+                });
+                gapiInited = true;
+            } catch (error) {
+                console.error('Google API 초기화 오류:', error);
+            }
         }
 
         function gisLoaded() {
-            tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: CLIENT_ID,
-                scope: SCOPES,
-                callback: '', // 나중에 설정
-            });
-            gisInited = true;
+            if (typeof google !== 'undefined' && google.accounts) {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: '', // 나중에 설정
+                });
+                gisInited = true;
+            }
         }
 
-        // 페이지 로드 시 초기화
+        // 페이지 로드 시 안전하게 초기화
         window.addEventListener('load', () => {
-            gapiLoaded();
-            gisLoaded();
+            // Google API 스크립트가 로드될 때까지 기다림
+            const checkAndInit = () => {
+                if (typeof gapi !== 'undefined') {
+                    gapiLoaded();
+                } else {
+                    setTimeout(checkAndInit, 100);
+                }
+            };
+            
+            const checkAndInitGis = () => {
+                if (typeof google !== 'undefined' && google.accounts) {
+                    gisLoaded();
+                } else {
+                    setTimeout(checkAndInitGis, 100);
+                }
+            };
+            
+            checkAndInit();
+            checkAndInitGis();
         });
 
         // 구글 시트로 내보내기
@@ -2225,18 +2267,33 @@
                         });
                     }
 
-                    // 월별 코호트
-                    let monthlyCohortData = [['코호트', '인원', 'M+1', 'M+2', 'M+3']];
+                    // 월별 코호트 - 동적으로 전체 기간 계산
+                    let monthlyPeriods = [];
+                    if (retentionResult.cohort_analysis) {
+                        const allPeriods = new Set();
+                        Object.values(retentionResult.cohort_analysis.monthly).forEach(data => {
+                            Object.keys(data.retention || {}).forEach(period => {
+                                allPeriods.add(period);
+                            });
+                        });
+                        // 기간을 숫자 순서대로 정렬 (M+1, M+2, ... M+10)
+                        monthlyPeriods = Array.from(allPeriods).sort((a, b) => {
+                            const numA = parseInt(a.match(/\d+/)[0]);
+                            const numB = parseInt(b.match(/\d+/)[0]);
+                            return numA - numB;
+                        });
+                    }
+                    
+                    let monthlyCohortData = [['코호트', '인원', ...monthlyPeriods]];
                     if (retentionResult.cohort_analysis) {
                         Object.keys(retentionResult.cohort_analysis.monthly).forEach(cohort => {
                             const data = retentionResult.cohort_analysis.monthly[cohort];
-                            monthlyCohortData.push([
+                            const row = [
                                 cohort,
                                 data.cohort_size,
-                                data.retention['M+1'] || '',
-                                data.retention['M+2'] || '',
-                                data.retention['M+3'] || ''
-                            ]);
+                                ...monthlyPeriods.map(period => data.retention[period] || '')
+                            ];
+                            monthlyCohortData.push(row);
                         });
                     }
 

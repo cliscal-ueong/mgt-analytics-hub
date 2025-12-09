@@ -1414,17 +1414,16 @@
                 };
                 
                 const cohortIdx = allMonths.indexOf(cohortMonth);
-                for (let offset of [1, 2, 3]) {
-                    if (cohortIdx + offset < allMonths.length) {
-                        const targetMonth = allMonths[cohortIdx + offset];
-                        const targetUsers = new Set(
-                            processed.filter(p => p.month === targetMonth).map(p => p.buyer)
-                        );
-                        
-                        const retained = cohortUsers.filter(buyer => targetUsers.has(buyer)).length;
-                        const rate = (retained / cohortUsers.length * 100);
-                        monthlyCohorts[cohortMonth].retention[`M+${offset}`] = parseFloat(rate.toFixed(2));
-                    }
+                // 전체 범위 계산 (M+1부터 데이터 끝까지)
+                for (let offset = 1; cohortIdx + offset < allMonths.length; offset++) {
+                    const targetMonth = allMonths[cohortIdx + offset];
+                    const targetUsers = new Set(
+                        processed.filter(p => p.month === targetMonth).map(p => p.buyer)
+                    );
+                    
+                    const retained = cohortUsers.filter(buyer => targetUsers.has(buyer)).length;
+                    const rate = (retained / cohortUsers.length * 100);
+                    monthlyCohorts[cohortMonth].retention[`M+${offset}`] = parseFloat(rate.toFixed(2));
                 }
             });
 
